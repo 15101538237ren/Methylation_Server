@@ -28,6 +28,21 @@ class FuncionUtil(object):
             cpg_pos = d[i] + cpg_pos
             cpg_pos_list.append(cpg_pos)
         return cpg_pos,cpg_pos_list
+
+    # generate the cpg site which follow the m_ratio and u_ratio
+    def generate_CpG_in_methylation_percent_UHM(self,CpG_sites_counts, m_ratio, u_ratio):
+        CpG_str = "" # null string
+
+        for i in range(1, CpG_sites_counts + 1): # random a number which determin the status of the target site
+            random_num = random.random()
+            if random_num <= m_ratio:
+                CpG_str += "M"
+            elif random_num > m_ratio and random_num <= m_ratio + u_ratio:
+                CpG_str += "U"
+            else:
+                CpG_str += "H"
+        # 返回生成的状态字符串,长度=CpG_sites_counts
+        return CpG_str
 if __name__ == '__main__':
     #create function utility object
     function_util=FuncionUtil()
@@ -37,3 +52,11 @@ if __name__ == '__main__':
     geometric_p=0.3
     plot=True
     cpg_max_pos, cpg_pos_list=function_util.construct_n_cpg_sites_for_exp_distribution(n_cpg_sites,geometric_p,plot=plot)
+
+    #the site origin ratio
+    m_ratio=0.181214
+    h_ratio=0.427782
+    u_ratio=0.391004
+
+    #generate a cpg chain which have the methylation status
+    CpG_str=function_util.generate_CpG_in_methylation_percent_UHM(n_cpg_sites,m_ratio,u_ratio)
