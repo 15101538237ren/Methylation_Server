@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 import random,math,os,threading,datetime
 import numpy as np
+from FunctionUtil import FunctionUtil
 
 BED_FILE_PATH="chr1.bed"
 THRESHOLD_U=0.2
@@ -12,7 +13,7 @@ RIGHT_STATUS_OF_REACTION={0:"U",1:"H",2:"M",3:"H",4:"H",5:"H",6:"U",7:"H",8:"M"}
 STATE_OF_COLLABOR_REACTION={4:"H",5:"M",6:"M",7:"U",8:"U"}
 BASE_RATE_HASH={4:1,5:1,6:0,7:3,8:2} #collaboration reaction base reaction rate index_hash
 COLLABORATION_INDEX=4
-class Simulatior(object):
+class Simulator(object):
     '''
         This is a base class for nearby , random collaborative and traditional simulation
     '''
@@ -45,6 +46,7 @@ class Simulatior(object):
     def run(self):
         starttime_new=datetime.datetime.now()
         for i_round in self.rounds:
+            self.threads=[]
             starttime_a_round = datetime.datetime.now()
 
             detail_file_full_path = self.out_dir + os.sep + "detail_" + str(i_round) + ".csv" # the sites status detail statistics file
@@ -76,7 +78,10 @@ class Simulatior(object):
                         threads_to_simulate = self.threads[i * self.max_threads:len(self.threads)]
                     # 启动线程
                     for t in threads_to_simulate:
-                        t.start()
+                        try:
+                            t.start()
+                        except RuntimeError,e:
+                            print e
                     for t in threads_to_simulate:
                         t.join()
                     print '%d round:%d turn thread is waitting for next execution...' % (i_round, i)
@@ -93,7 +98,7 @@ class Simulatior(object):
         self.lock.acquire()
         for item in list:
             print >> file, item
-            self.lock.release()
+        self.lock.release()
     def multi_thread_simulation(self, times_idx, thread_no, generations, n_time_step, init_cell, detail_file, detail_for_time_steps, ratio_file, propensity_list, exp_name, nearby=-1, max_cells=1000, index_pos_list=[]):
         print "%d round: Thread %d is started!" % (times_idx, thread_no)
         cell_collection = [init_cell]
@@ -220,9 +225,11 @@ class Simulatior(object):
                             continue
                     else:
                         #非协作反应,孤立反应
-                        CpG_str_list=list(cell_collection[idx])
-                        CpG_str_list[target_reaction_CpG_site]=REACTION_STATUS_HASH[reaction_id]
-                        cell_collection[idx]=''.join(CpG_str_list)
+                        cell_status=cell_collection[idx]
+                        CpG_pre_str=cell_status[0:target_reaction_CpG_site]
+                        CpG_post_str = cell_status[target_reaction_CpG_site+1:len(cell_status)]
+                        cell_collection[idx]=CpG_pre_str+REACTION_STATUS_HASH[reaction_id]+CpG_post_str
+                        #print "pre is %s and post is %s" %(cell_status[target_reaction_CpG_site],cell_collection[idx][target_reaction_CpG_site])
                 if M_count_statistics!=None and H_count_statistics!=None and U_count_statistics!=None:
                     m_count=cell_collection[idx].count("M")
                     M_count_statistics[j].append(m_count)
@@ -286,3 +293,30 @@ class Simulatior(object):
                     cell1 = cell1 + "U"
                     cell2 = cell2 + "H"
         return [cell1, cell2]
+if __name__ == '__main__':
+    function_util = FunctionUtil()
+    #traditional simulation
+    traditional_propensity_list=function_util.set_standard_params(U_plus_in=0.05,H_plus_in=0.05 ,M_minus_in=0.05,H_minus_in=0.05)
+    sim_rounds=range(1,2)
+
+    traditional_index="traditional_simulation"
+    TRADITIONAL_OUTPUT_DIR="data"+os.sep+traditional_index
+
+    max_cpg_sites=1000
+    generations=10
+    multi_threads=False
+    nearby=-1
+    max_cells=2
+    detail_for_timestep=[0,1,2]
+
+    geometric_p = 0.3
+    plot = False
+    cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
+                                                                                         plot=plot)
+    m_ratio = 0.181214 # the site origin ratio
+    h_ratio = 0.427782
+    u_ratio = 0.391004
+
+    init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio, u_ratio) # generate a cpg chain which have the methylation status
+    simulator=Simulator(traditional_propensity_list,rounds=sim_rounds,out_dir=TRADITIONAL_OUTPUT_DIR,max_cpg_sites=max_cpg_sites,generations=generations,pos_list=pos_list,multi_threads=multi_threads,init_cell=init_cell,nearby=nearby,max_cells=max_cells,index=traditional_index,detail_for_timestep=detail_for_timestep)
+    simulator.run()

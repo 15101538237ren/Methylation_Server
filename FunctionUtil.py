@@ -2,7 +2,7 @@
 import random,math
 import numpy as np
 import matplotlib.pyplot as plt
-class FuncionUtil(object):
+class FunctionUtil(object):
     '''
     This is a function utilities class
     '''
@@ -43,9 +43,13 @@ class FuncionUtil(object):
                 CpG_str += "H"
         # 返回生成的状态字符串,长度=CpG_sites_counts
         return CpG_str
+    def set_standard_params(self,U_plus_in,H_plus_in,M_minus_in,H_minus_in):
+        return [U_plus_in,H_plus_in,M_minus_in,H_minus_in]
+    def set_collaborative_params(self,U_plus_in, H_plus_in, M_minus_in, H_minus_in, H_p_H_in, H_p_M_in, U_p_M_in, H_m_U_in, M_m_U_in): # 设置协作反应的参数
+        return [U_plus_in, H_plus_in, M_minus_in, H_minus_in, H_p_H_in, H_p_M_in, U_p_M_in, H_m_U_in, M_m_U_in]
 if __name__ == '__main__':
     #create function utility object
-    function_util=FuncionUtil()
+    function_util=FunctionUtil()
 
     #set param for create a pos list obey geometric distribution
     n_cpg_sites=500
