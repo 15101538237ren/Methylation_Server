@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import random,math,os,threading,datetime
+import random,math,os,threading,datetime,re,shutil
 import numpy as np
 from FunctionUtil import FunctionUtil
 
@@ -293,30 +293,257 @@ class Simulator(object):
                     cell1 = cell1 + "U"
                     cell2 = cell2 + "H"
         return [cell1, cell2]
-if __name__ == '__main__':
-    function_util = FunctionUtil()
-    #traditional simulation
-    traditional_propensity_list=function_util.set_standard_params(U_plus_in=0.05,H_plus_in=0.05 ,M_minus_in=0.05,H_minus_in=0.05)
-    sim_rounds=range(1,2)
+    
+    def sort_the_simulaiton_result(self,in_pre_dir,start_round,end_round,excepts_rounds=[],is_filter=False,filter_bounds=[]):# 对多线程的模拟结果进行排序整合成按照generation的统计文件,见sorted_ratio/和sorted_detail文件夹
 
-    traditional_index="traditional_simulation"
-    TRADITIONAL_OUTPUT_DIR="data"+os.sep+traditional_index
+        output_ratio_dir=in_pre_dir+os.sep+ "sorted_ratio"
+        if not os.path.exists(output_ratio_dir):
+            os.makedirs(output_ratio_dir)
 
-    max_cpg_sites=1000
-    generations=10
-    multi_threads=False
-    nearby=-1
-    max_cells=2
-    detail_for_timestep=[0,1,2]
+        output_detail_dir=in_pre_dir+os.sep+ "sorted_detail"
+        if not os.path.exists(output_detail_dir):
+            os.makedirs(output_detail_dir)
+        self.sort_ratio(in_pre_dir,output_ratio_dir,start_round,end_round,excepts_rounds=excepts_rounds,is_filter=is_filter,filter_bounds=filter_bounds)
+        self.sort_detail(in_pre_dir,output_detail_dir,start_round,end_round,excepts_rounds)
+
+    def set_filter_range_bounds(self,m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52):
+        return [m_down,m_up,h_down,h_up,u_down,u_up]
+    def sort_ratio(self,input_file_dir, output_file_dir, start_round, end_round, excepts_rounds=[], is_filter=False,filter_bounds=[]): # 对各个线程产生的ratio进行排序,生成gen_X_XX_ratio.csv
+        pattern = r'(\d+),([\d]+\.[\d]*),([\d]+\.[\d]*),([\d]+\.[\d]*),([\d]+\.[\d]*)'
+        hash_of_sort_ratio = {}
+        for i in range(start_round, end_round + 1):
+            if i in excepts_rounds:
+                continue
+            hash_of_i = {}
+            infile_path = input_file_dir + os.sep + "ratio_" + str(i) + ".csv"
+            infile = open(infile_path, "r")
+            line = infile.readline()
+            while line:
+                match = re.search(pattern, line)
+                if match:
+                    thread_no = int(match.group(1))
+                    generation_step = float(match.group(2))
+                    m_ratio = float(match.group(3))
+                    h_ratio = float(match.group(4))
+                    u_ratio = float(match.group(5))
+
+                    ratio_list = [m_ratio, h_ratio, u_ratio]
+
+                    if generation_step not in hash_of_i.keys():
+                        hash_of_i[generation_step] = {}
+                    hash_of_i[generation_step][thread_no] = ratio_list
+
+                line = infile.readline()
+                if not line:
+                    break
+            hash_of_i_new = {}
+            for (key, val) in hash_of_i.items():
+                sorted_hash_of_gen = sorted(val.iteritems(), key=lambda d: d[0])
+                hash_of_i_new[key] = sorted_hash_of_gen
+            hash_of_sort_ratio[i] = hash_of_i_new
+            infile.close()
+        generation_steps = hash_of_sort_ratio[start_round].keys()
+
+        for gen_step in generation_steps:
+            gen_step_str = str(gen_step).replace(".", "_")
+            out_file_path = output_file_dir + os.sep + "gen_" + gen_step_str + "_ratio.csv"
+            out_file = open(out_file_path, 'w')
+            gen_is_good = False
+            for round_i in range(start_round, end_round + 1):
+                if round_i in excepts_rounds:
+                    continue
+                seq_list = hash_of_sort_ratio[round_i][gen_step]
+
+                # 1.产生比例的时候把此部分取消注释
+                if is_filter == False:
+                    out_file.write(str(round_i) + ",")
+
+                    len_item_of_seq_list = len(seq_list[0][1])
+                    thread_num = len(seq_list)
+                    for m_h_u_i in range(len_item_of_seq_list):
+                        for thread_no in range(thread_num):
+                            out_file.write(str(seq_list[thread_no][1][m_h_u_i]) + ",")
+                    out_file.write("\n")
+                # 1.end
+
+                # 2.统计可用的参数时把此部分取消注释
+                elif is_filter == True:
+                    m_sum = 0
+                    u_sum = 0
+                    h_sum = 0
+
+                    index = 0
+                    thread_num = len(seq_list)
+                    for thread_no in range(thread_num):
+                        index = index + 1
+                        m_sum = m_sum + seq_list[thread_no][1][0]
+                        h_sum = h_sum + seq_list[thread_no][1][1]
+                        u_sum = u_sum + seq_list[thread_no][1][2]
+                    m_mean = m_sum / float(index)
+                    h_mean = h_sum / float(index)
+                    u_mean = u_sum / float(index)
+
+                    if m_mean > filter_bounds[0] and m_mean < filter_bounds[1] and h_mean > filter_bounds[2] and h_mean < filter_bounds[3] and u_mean > filter_bounds[4] and u_mean < filter_bounds[5]:
+                        print "gen: %f round:%d ,m:%f ,h:%f ,u:%f" % (gen_step, round_i, m_mean, h_mean, u_mean)
+                        gen_is_good = True
+                        out_file.write(str(round_i) + "," + str(m_mean) + "," + str(h_mean) + "," + str(u_mean) + "\n")
+                        # 2.end
+            out_file.close()
+            if gen_is_good==False and is_filter==True:
+                os.remove(out_file_path)
+    def sort_detail(self,input_file_dir, output_file_dir,start_round,end_round, excepts_rounds=[]): # 对各个线程产生的位点状态结果进行排序,生成一个文件gen_X_XX_detail.csv
+        pattern = r'(\d+),([\d]+\.[\d]*),(\d+),([UMH]+)\s'
+        hash_of_sort_detail = {}
+        for i in range(start_round,end_round + 1):
+            if i in excepts_rounds:
+                continue
+            hash_of_i = {}
+            infile_path = input_file_dir + os.sep + "detail_" + str(i) + ".csv"
+            infile = open(infile_path, "r")
+            line = infile.readline()
+            while line:
+                match = re.search(pattern, line)
+                thread_no = int(match.group(1))
+                generation_step = float(match.group(2))
+                seq = match.group(4)
+
+                if generation_step not in hash_of_i.keys():
+                    hash_of_i[generation_step] = {}
+                hash_of_i[generation_step][thread_no] = seq
+
+                line = infile.readline()
+                if not line:
+                    break
+            hash_of_i_new = {}
+            for (key, val) in hash_of_i.items():
+                sorted_hash_of_gen = sorted(val.iteritems(), key=lambda d: d[0])
+                hash_of_i_new[key] = sorted_hash_of_gen
+            hash_of_sort_detail[i] = hash_of_i_new
+            infile.close()
+        generation_steps = hash_of_sort_detail[start_round].keys()
+
+        for gen_step in generation_steps:
+            gen_step_str=str(gen_step).replace(".","_")
+            out_file_path = output_file_dir + os.sep + "gen_" + gen_step_str+ "_detail.csv"
+            out_file = open(out_file_path, 'w')
+            for round_i in range(start_round,end_round + 1):
+                if round_i in excepts_rounds:
+                    continue
+                seq_list = hash_of_sort_detail[round_i][gen_step]
+                for (index, item) in seq_list:
+                    if index == 0:
+                        out_file.write(str(round_i) + ",")
+                    out_file.write(item)
+                out_file.write("\n")
+            out_file.close()
+    def get_sites_index_arr_from_file(self,out_cpg_sites_origin_path): # 从bed文件中提取所有的位点位置形成一个数组
+        cpg_indexs = []
+        cpg_sites_file = open(out_cpg_sites_origin_path, "r")
+        line = cpg_sites_file.readline()
+
+        while line:
+            index_line_arr = line.split(",")
+            # 提取postion,写入position value \n.
+            pos_index = int(index_line_arr[1])
+            cpg_indexs.append(pos_index)
+            line = cpg_sites_file.readline()
+            if not line and line.strip() == "":
+                break
+        cpg_sites_file.close()
+
+        return cpg_indexs
+
+    def convert_sorted_result_to_bed(self,out_cpg_sites_origin_path, detail_dir, bed_target_dir, start, end, excepts=[],
+                                     gens=[]):# 从CpG_sites位点和值得原始文件结合输出的模拟的各位点状态统计最后模拟的各个generation的模拟甲基化水平,输出到相应的文件夹
+        cpg_indexs = self.get_sites_index_arr_from_file(out_cpg_sites_origin_path)
+
+        for item in gens:
+            print "now handling %f gen!" % item
+            detail_file = open(detail_dir + os.sep + "gen_" + str(item) + "_detail.csv", "r")
+            bed_file = open(bed_target_dir + os.sep + "gen_" + str(item) + ".bed", "w")
+            detail_line = detail_file.readline()
+            index = 0
+            methy_status = []
+            while detail_line:
+                index = index + 1
+                line_arr = detail_line.split(",")
+                seq = line_arr[1]
+
+                for no, ch in enumerate(seq):
+                    if ch == "M":
+                        if index == 1:
+                            methy_status.append(2)
+                        else:
+                            methy_status[no] = methy_status[no] + 2
+                    elif ch == "H":
+                        if index == 1:
+                            methy_status.append(1)
+                        else:
+                            methy_status[no] = methy_status[no] + 1
+                    elif ch == "U":
+                        if index == 1:
+                            methy_status.append(0)
+                detail_line = detail_file.readline()
+                if not detail_line:
+                    break
+            print "index is %d" % index
+            methy_status_arr = np.array(methy_status)
+            methy_mean_arr = methy_status_arr / (float(index) * 2)
+            methy_mean_list = methy_mean_arr.tolist()
+
+            len_of_mean_list = len(methy_mean_list)
+            for mean_index in range(len_of_mean_list):
+                line_to_wrt = str(cpg_indexs[mean_index]) + " " + str(methy_mean_list[mean_index]) + "\n"
+                bed_file.write(line_to_wrt)
+            bed_file.close()
+            detail_file.close()
+            print "now finished %f gen!" % item
+    def sort_to_bed(self,out_cpg_sites_origin_path, detail_dir, bed_dir, start, end, excepts, gens):
+        if not os.path.exists(bed_dir):
+            os.makedirs(bed_dir)
+        self.convert_sorted_result_to_bed(out_cpg_sites_origin_path, detail_dir, bed_dir, start, end, excepts, gens)
+def traditional_simulation(function_util):
+    # traditional simulation
+    traditional_propensity_list = function_util.set_standard_params(U_plus_in=0.05, H_plus_in=0.05, M_minus_in=0.05,
+                                                                    H_minus_in=0.05)
+    sim_rounds = range(1,6)
+
+    traditional_index = "traditional_simulation"
+    TRADITIONAL_OUTPUT_DIR = "data" + os.sep + traditional_index
+
+    max_cpg_sites = 2000
+    generations = 10
+    multi_threads = True
+    nearby = -1
+    max_cells = 2
+    detail_for_timestep = [0, 1, 2]
 
     geometric_p = 0.3
     plot = False
     cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
-                                                                                         plot=plot)
-    m_ratio = 0.181214 # the site origin ratio
+                                                                                     plot=plot)
+    m_ratio = 0.181214  # the site origin ratio
     h_ratio = 0.427782
     u_ratio = 0.391004
 
-    init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio, u_ratio) # generate a cpg chain which have the methylation status
-    simulator=Simulator(traditional_propensity_list,rounds=sim_rounds,out_dir=TRADITIONAL_OUTPUT_DIR,max_cpg_sites=max_cpg_sites,generations=generations,pos_list=pos_list,multi_threads=multi_threads,init_cell=init_cell,nearby=nearby,max_cells=max_cells,index=traditional_index,detail_for_timestep=detail_for_timestep)
+    init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,
+                                                                      u_ratio)  # generate a cpg chain which have the methylation status
+    simulator = Simulator(traditional_propensity_list, rounds=sim_rounds, out_dir=TRADITIONAL_OUTPUT_DIR,
+                          max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
+                          multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
+                          index=traditional_index, detail_for_timestep=detail_for_timestep)
     simulator.run()
+
+    src_dir = TRADITIONAL_OUTPUT_DIR + os.sep + "sorted_ratio"
+    dis_dir = TRADITIONAL_OUTPUT_DIR + os.sep + "sorted_ratio_bk"
+
+    simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
+    shutil.copytree(src_dir, dis_dir)
+
+    filter_bounds=simulator.set_filter_range_bounds(m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52)
+    simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], True,filter_bounds) # filter the sort result according to the filter bound for m,h,u ratio
+
+
+if __name__ == '__main__':
+    function_util = FunctionUtil()
+    traditional_simulation(function_util)
