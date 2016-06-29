@@ -18,7 +18,7 @@ class Simulatior(object):
     '''
 
     # Construction function
-    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index"):
+    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1]):
         #create the output dir
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
@@ -34,6 +34,7 @@ class Simulatior(object):
         self.max_cells=max_cells
         self.index=index
         self.lock = threading.Lock()
+        self.detail_for_timestep=detail_for_timestep
         if self.multi_threads==True:
             self.num_sites_per_thread=1000
             self.max_threads = 250
@@ -63,9 +64,9 @@ class Simulatior(object):
                     init_cell_of_thread = self.init_cell[start:end]
                     pos_tmp_list = self.pos_list[start:end]
                     # create thread
-                    th = threading.Thread(target=multi_thread_simulation, args=(
-                    i_round,thread_no, self.generations, N_STEP, init_cell_of_thread, detail_file, [0, 1, 2], statistics_file,
-                    self.propensity_list, self.index,self.nearby, self.max_cells, cal_fun, pos_tmp_list))
+                    th = threading.Thread(target=self.multi_thread_simulation, args=(
+                    i_round, thread_no, self.generations, N_STEP, init_cell_of_thread, detail_file,self.detail_for_timestep , ratio_file,
+                    self.propensity_list, self.index,self.nearby, self.max_cells, pos_tmp_list))
                     self.threads.append(th)
 
                 for i in range(self.num_turns):
@@ -80,11 +81,10 @@ class Simulatior(object):
                         t.join()
                     print '%d round:%d turn thread is waitting for next execution...' % (i_round, i)
                 detail_file.close()
-                statistics_file.close()
+                ratio_file.close()
             else:
-                single_simulation(self.generations, N_STEP, self.init_cell, ratio_file_full_path, starttime,
-                                     detail_file_full_path, self.propensity_list, self.index, nearby=self.nearby, max_cells= self.max_cells,
-                                     col_func=col_func, index_pos_list=self.pos_list)
+                self.multi_thread_simulation(i_round,0,self.generations, N_STEP, self.init_cell,
+                                  detail_file, self.detail_for_timestep, ratio_file, self.propensity_list, self.index, nearby=self.nearby, max_cells= self.max_cells,index_pos_list=self.pos_list)
             endtime_a_round = datetime.datetime.now()
             print "One Round in " + str((endtime_a_round - starttime_a_round).seconds) + " seconds\n"
         endtime = datetime.datetime.now()
@@ -94,7 +94,7 @@ class Simulatior(object):
         for item in list:
             print >> file, item
             self.lock.release()
-    def multi_thread_simulation(self,times_idx,thread_no,generations,n_time_step,init_cell,detail_file,detail_for_time_steps,statistics_file,propensity_list,exp_name,nearby=-1,max_cells=1000,col_func=None,index_pos_list=[],is_param_try=False,param_file=None):
+    def multi_thread_simulation(self, times_idx, thread_no, generations, n_time_step, init_cell, detail_file, detail_for_time_steps, ratio_file, propensity_list, exp_name, nearby=-1, max_cells=1000, index_pos_list=[]):
         print "%d round: Thread %d is started!" % (times_idx, thread_no)
         cell_collection = [init_cell]
 
@@ -116,9 +116,9 @@ class Simulatior(object):
                 M_count_statistics.append([])
                 H_count_statistics.append([])
                 U_count_statistics.append([])
-            M_count_statistics, H_count_statistics, U_count_statistics, out_detail_seq_arr, cell_collection, cells_wait_to_add = simulate_common(
+            M_count_statistics, H_count_statistics, U_count_statistics, out_detail_seq_arr, cell_collection, cells_wait_to_add = self.simulate_common(
                 cell_collection, n_time_step, propensity_list, M_count_statistics, H_count_statistics,
-                U_count_statistics, cells_wait_to_add, nearby, detail_for_time_steps, col_func=col_func,
+                U_count_statistics, cells_wait_to_add, nearby, detail_for_time_steps,
                 index_pos_list=index_pos_list)
 
             m_means_ratio = (np.mean(np.array(M_count_statistics), axis=1) / len(init_cell)).tolist()
@@ -135,7 +135,7 @@ class Simulatior(object):
                         round(u_means_ratio[t], 4)) + "\n"
                     out_str_of_statistics.append(out_str)
 
-            self.multi_thread_write_of_a_list(statistics_file, out_str_of_statistics) # write the ratio file in the multi_thread env
+            self.multi_thread_write_of_a_list(ratio_file, out_str_of_statistics) # write the ratio file in the multi_thread env
             print "%d round:thread %d finished writing statistics file and start to wrt detail file!" % (
             times_idx, thread_no)
 
@@ -154,7 +154,7 @@ class Simulatior(object):
             times_idx, thread_no, exp_name, i, len(cell_collection), len(cells_wait_to_add), time_collapsed)
 
             cell_collection = cells_wait_to_add
-    def simulate_common(self,cell_collection,n_time_step,PROPENCITY_LIST,M_count_statistics,H_count_statistics,U_count_statistics,cells_wait_to_add,nearby,detail_for_time_steps=[],col_func=None,index_pos_list=[]):
+    def simulate_common(self,cell_collection,n_time_step,PROPENCITY_LIST,M_count_statistics,H_count_statistics,U_count_statistics,cells_wait_to_add,nearby,detail_for_time_steps=[],index_pos_list=[]):
         out_detail_seq_arr=[]
         for idx,cell in enumerate(cell_collection): #loop cell in cell_collection
 
@@ -241,27 +241,23 @@ class Simulatior(object):
             return M_count_statistics,H_count_statistics,U_count_statistics,out_detail_seq_arr,cell_collection,cells_wait_to_add
         else:
             return cell_collection,cells_wait_to_add
-
-    #the phi function which used for control the collaborative rate
-    def phi(self,d=2):
+    def phi(self,d=2): #the phi function which used for control the collaborative rate
         return 1.0
-
-    # according to the ratio to scale the propensity_list collaborative rate
-    def scale_propensity_list(self,ratio,propensity_list):
+    def scale_propensity_list(self,ratio,propensity_list): # according to the ratio to scale the propensity_list collaborative rate
         if len(propensity_list) <= 4:
             return propensity_list
         else:
             propensity_list_new = []
-            for i in range(0, 4):
-                propensity_list_new.append(propensity_list[i]) # add in the non-collaborative reaction rate
-            for i in range(4, 9):
-                base_rate = propensity_list[BASE_RATE_HASH[i]] # calculate the reaction rate
-                scale = propensity_list[i] - base_rate
-                new_reaction_rate = base_rate + scale * ratio
+            for i in range(0,9):
+                if i >= 4:
+                    base_rate = propensity_list[BASE_RATE_HASH[i]] # calculate the reaction rate
+                    scale = propensity_list[i] - base_rate
+                    new_reaction_rate = base_rate + scale * ratio
 
-                propensity_list_new.append(new_reaction_rate)
+                    propensity_list_new.append(new_reaction_rate)
+                else:
+                    propensity_list_new.append(propensity_list[i])  # add in the non-collaborative reaction rate
             return propensity_list_new
-
     def select_reaction(self,propencity_list, num_of_reactions, sum_propencity, random_number):
         reaction = -1
         tmp_sum_propencity = 0.0
@@ -272,7 +268,6 @@ class Simulatior(object):
                 reaction = i
                 break
         return reaction
-
     def cell_division(self,cell):
         cell1 = ""
         cell2 = ""
