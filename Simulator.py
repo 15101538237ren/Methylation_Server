@@ -37,7 +37,7 @@ class Simulator(object):
         self.lock = threading.Lock()
         self.detail_for_timestep=detail_for_timestep
         if self.multi_threads==True:
-            self.num_sites_per_thread=1000
+            self.num_sites_per_thread=100
             self.max_threads = 250
             self.num_of_threads = int(math.ceil(float(len(init_cell)) / self.num_sites_per_thread)) # thread counts
             self.num_turns = int(math.ceil(float(self.num_of_threads) / self.max_threads)) # when the max_thread is not enough for one round simulation, split it in to num_turns
@@ -294,17 +294,16 @@ class Simulator(object):
                     cell2 = cell2 + "H"
         return [cell1, cell2]
     
-    def sort_the_simulaiton_result(self,in_pre_dir,start_round,end_round,excepts_rounds=[],is_filter=False,filter_bounds=[]):# 对多线程的模拟结果进行排序整合成按照generation的统计文件,见sorted_ratio/和sorted_detail文件夹
+    def sort_the_simulaiton_result(self,base_dir,sorted_ratio_dir,sort_detail_dir,start_round,end_round,excepts_rounds=[],is_filter=False,filter_bounds=[]):# 对多线程的模拟结果进行排序整合成按照generation的统计文件,见sorted_ratio/和sorted_detail文件夹
+        if not os.path.exists(sorted_ratio_dir):
+            os.makedirs(sorted_ratio_dir)
 
-        output_ratio_dir=in_pre_dir+os.sep+ "sorted_ratio"
-        if not os.path.exists(output_ratio_dir):
-            os.makedirs(output_ratio_dir)
+        if not os.path.exists(sort_detail_dir):
+            os.makedirs(sort_detail_dir)
+        remained_generations=self.sort_ratio(base_dir,sorted_ratio_dir,start_round,end_round,excepts_rounds=excepts_rounds,is_filter=is_filter,filter_bounds=filter_bounds)
+        self.sort_detail(base_dir,sort_detail_dir,start_round,end_round,excepts_rounds)
 
-        output_detail_dir=in_pre_dir+os.sep+ "sorted_detail"
-        if not os.path.exists(output_detail_dir):
-            os.makedirs(output_detail_dir)
-        self.sort_ratio(in_pre_dir,output_ratio_dir,start_round,end_round,excepts_rounds=excepts_rounds,is_filter=is_filter,filter_bounds=filter_bounds)
-        self.sort_detail(in_pre_dir,output_detail_dir,start_round,end_round,excepts_rounds)
+        return remained_generations
 
     def set_filter_range_bounds(self,m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52):
         return [m_down,m_up,h_down,h_up,u_down,u_up]
@@ -343,7 +342,7 @@ class Simulator(object):
             hash_of_sort_ratio[i] = hash_of_i_new
             infile.close()
         generation_steps = hash_of_sort_ratio[start_round].keys()
-
+        remained_generations=[]
         for gen_step in generation_steps:
             gen_step_str = str(gen_step).replace(".", "_")
             out_file_path = output_file_dir + os.sep + "gen_" + gen_step_str + "_ratio.csv"
@@ -387,10 +386,14 @@ class Simulator(object):
                         print "gen: %f round:%d ,m:%f ,h:%f ,u:%f" % (gen_step, round_i, m_mean, h_mean, u_mean)
                         gen_is_good = True
                         out_file.write(str(round_i) + "," + str(m_mean) + "," + str(h_mean) + "," + str(u_mean) + "\n")
+                        if gen_step not in remained_generations:
+                            remained_generations.append(gen_step)
                         # 2.end
             out_file.close()
             if gen_is_good==False and is_filter==True:
                 os.remove(out_file_path)
+        if is_filter==True:
+            return remained_generations
     def sort_detail(self,input_file_dir, output_file_dir,start_round,end_round, excepts_rounds=[]): # 对各个线程产生的位点状态结果进行排序,生成一个文件gen_X_XX_detail.csv
         pattern = r'(\d+),([\d]+\.[\d]*),(\d+),([UMH]+)\s'
         hash_of_sort_detail = {}
@@ -453,14 +456,12 @@ class Simulator(object):
 
         return cpg_indexs
 
-    def convert_sorted_result_to_bed(self,out_cpg_sites_origin_path, detail_dir, bed_target_dir, start, end, excepts=[],
-                                     gens=[]):# 从CpG_sites位点和值得原始文件结合输出的模拟的各位点状态统计最后模拟的各个generation的模拟甲基化水平,输出到相应的文件夹
-        cpg_indexs = self.get_sites_index_arr_from_file(out_cpg_sites_origin_path)
-
-        for item in gens:
-            print "now handling %f gen!" % item
-            detail_file = open(detail_dir + os.sep + "gen_" + str(item) + "_detail.csv", "r")
-            bed_file = open(bed_target_dir + os.sep + "gen_" + str(item) + ".bed", "w")
+    def convert_sorted_result_to_bed(self,pos_list, detail_dir, bed_target_dir,gens=[]):# 从CpG_sites位点和值得原始文件结合输出的模拟的各位点状态统计最后模拟的各个generation的模拟甲基化水平,输出到相应的文件夹
+        for gen_i in gens:
+            print "now convert the  %f gen sorted result to bed!" % gen_i
+            gen_step_str = str(gen_i).replace(".", "_")
+            detail_file = open(detail_dir + os.sep + "gen_" + gen_step_str + "_detail.csv", "r")
+            bed_file = open(bed_target_dir + os.sep + "gen_" +gen_step_str+ ".bed", "w")
             detail_line = detail_file.readline()
             index = 0
             methy_status = []
@@ -493,25 +494,47 @@ class Simulator(object):
 
             len_of_mean_list = len(methy_mean_list)
             for mean_index in range(len_of_mean_list):
-                line_to_wrt = str(cpg_indexs[mean_index]) + " " + str(methy_mean_list[mean_index]) + "\n"
+                line_to_wrt = str(pos_list[mean_index]) + " " + str(methy_mean_list[mean_index]) + "\n"
                 bed_file.write(line_to_wrt)
             bed_file.close()
             detail_file.close()
-            print "now finished %f gen!" % item
-    def sort_to_bed(self,out_cpg_sites_origin_path, detail_dir, bed_dir, start, end, excepts, gens):
+            print "now finished convert the  %f gen sorted result to bed!" % gen_i
+    def sort_to_bed(self,pos_list, detail_dir, bed_dir,gens):
         if not os.path.exists(bed_dir):
             os.makedirs(bed_dir)
-        self.convert_sorted_result_to_bed(out_cpg_sites_origin_path, detail_dir, bed_dir, start, end, excepts, gens)
+        self.convert_sorted_result_to_bed(pos_list, detail_dir, bed_dir, gens)
+    def calc_corr(self,bed_dir,rd_with_dir,rd_without_dir,gen_collection,corr_end,calc_interval=False,ignore_d=False):
+        if calc_interval==True:
+            if not os.path.exists(rd_with_dir):
+                os.makedirs(rd_with_dir)
+        if not os.path.exists(rd_without_dir):
+            os.makedirs(rd_without_dir)
+        for item in gen_collection:
+            print "now calc %s correlation!" % item
+            item_str=str(item).replace(".","_")
+            #输出文件
+            out_R_d_without_interval_file_name=rd_without_dir+os.sep+"chr1_r_d_without_"+item_str+".csv"
+            #输入的bed文件
+            bed_input=bed_dir+os.sep+"gen_"+str(item)+".bed"
+            #计算相关性,将d和rd输出到文件中,d:2-corr_end
+            if calc_interval==True:
+                out_R_d_with_interval_file_name=rd_with_dir+os.sep+"chr1_r_d_with_"+item_str+".csv"
+                calc_correlation(bed_input,out_R_d_with_interval_file_name,corr_end,True,ignore_d)
+            if ignore_d==True:
+                calc_correlation(bed_input,out_R_d_without_interval_file_name,corr_end,True,ignore_d)
+            else:
+                calc_correlation(bed_input,out_R_d_without_interval_file_name,corr_end,False,ignore_d)
+            print "now finished calc %s correlation!" % item
 def traditional_simulation(function_util):
     # traditional simulation
     traditional_propensity_list = function_util.set_standard_params(U_plus_in=0.05, H_plus_in=0.05, M_minus_in=0.05,
                                                                     H_minus_in=0.05)
-    sim_rounds = range(1,6)
+    sim_rounds = range(1,3)
 
     traditional_index = "traditional_simulation"
     TRADITIONAL_OUTPUT_DIR = "data" + os.sep + traditional_index
 
-    max_cpg_sites = 2000
+    max_cpg_sites = 500
     generations = 10
     multi_threads = True
     nearby = -1
@@ -532,18 +555,71 @@ def traditional_simulation(function_util):
                           max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
                           multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
                           index=traditional_index, detail_for_timestep=detail_for_timestep)
+    #simulator.run()
+
+    sorted_ratio_dir_name="sorted_ratio"
+    sorted_ratio_bk_dir_name="sorted_ratio_bk"
+    sorted_detail_dir_name="sorted_detail"
+    bed_files_dir_name="bed_files"
+
+    sorted_ratio_dir = TRADITIONAL_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
+    sorted_ratio_bk_dir = TRADITIONAL_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
+    sort_detail_dir = TRADITIONAL_OUTPUT_DIR + os.sep + sorted_detail_dir_name
+    bed_files_dir = TRADITIONAL_OUTPUT_DIR + os.sep + bed_files_dir_name
+
+    simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
+    shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
+    filter_bounds=simulator.set_filter_range_bounds(m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52)
+
+    remained_generations=simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], True,filter_bounds) # filter the sort result according to the filter bound for m,h,u ratio
+    simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_generations)
+    simulator.calc_corr(bed_files_dir,rd_with_dir,rd_without_ignore_d_dir,str_list_gen,2000,calc_interval=False,ignore_d=False)
+def random_col_simulation(function_util):
+    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.0005,H_plus_in=0.0005,M_minus_in=0.07,H_minus_in=0.069 ,H_p_H_in=0.22,H_p_M_in=0.22,U_p_M_in=0.23 ,H_m_U_in=0.072,M_m_U_in=0.06)
+
+    sim_rounds = range(1, 2)
+
+    random_index = "random_simulation"
+    RANDOM_OUTPUT_DIR = "data" + os.sep + random_index
+
+    max_cpg_sites = 1000
+    generations = 10
+    multi_threads = True
+    nearby = -1
+    max_cells = 2
+    detail_for_timestep = [0, 1, 2]
+
+    geometric_p = 0.3
+    plot = False
+    cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
+                                                                                     plot=plot)
+    m_ratio = 0.181214  # the site origin ratio
+    h_ratio = 0.427782
+    u_ratio = 0.391004
+
+    init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
+    simulator = Simulator(random_propensity_list, rounds=sim_rounds, out_dir=RANDOM_OUTPUT_DIR,
+                      max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
+                      multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
+                      index=random_index, detail_for_timestep=detail_for_timestep)
     simulator.run()
 
-    src_dir = TRADITIONAL_OUTPUT_DIR + os.sep + "sorted_ratio"
-    dis_dir = TRADITIONAL_OUTPUT_DIR + os.sep + "sorted_ratio_bk"
+    sorted_ratio_dir_name = "sorted_ratio"
+    sorted_ratio_bk_dir_name = "sorted_ratio_bk"
+    sorted_detail_dir_name = "sorted_detail"
 
-    simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
-    shutil.copytree(src_dir, dis_dir)
+    sorted_ratio_dir = RANDOM_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
+    sorted_ratio_bk_dir = RANDOM_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
+    sort_detail_dir = RANDOM_OUTPUT_DIR + os.sep + sorted_detail_dir_name
 
-    filter_bounds=simulator.set_filter_range_bounds(m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52)
-    simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], True,filter_bounds) # filter the sort result according to the filter bound for m,h,u ratio
+    simulator.sort_the_simulaiton_result(RANDOM_OUTPUT_DIR, sorted_ratio_dir, sort_detail_dir, simulator.rounds[0],
+                                         simulator.rounds[len(simulator.rounds) - 1], [], False)
 
-
+    list_gen=[simulator.rounds[len(simulator.rounds) - 1] + 0.01]
+    str_list_gen=[]
+    for item in list_gen:
+        str_list_gen.append(str(list_gen))
 if __name__ == '__main__':
     function_util = FunctionUtil()
     traditional_simulation(function_util)
+    #random_col_simulation(function_util)
