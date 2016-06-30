@@ -19,7 +19,7 @@ class Simulator(object):
     '''
 
     # Construction function
-    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1]):
+    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1,2],real_nearby=False,n_time_step=N_STEP):
         #create the output dir
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
@@ -36,6 +36,8 @@ class Simulator(object):
         self.index=index
         self.lock = threading.Lock()
         self.detail_for_timestep=detail_for_timestep
+        self.real_nearby=real_nearby
+        self.n_time_step=n_time_step
         if self.multi_threads==True:
             self.num_sites_per_thread=100
             self.max_threads = 250
@@ -67,8 +69,8 @@ class Simulator(object):
                     pos_tmp_list = self.pos_list[start:end]
                     # create thread
                     th = threading.Thread(target=self.multi_thread_simulation, args=(
-                    i_round, thread_no, self.generations, N_STEP, init_cell_of_thread, detail_file,self.detail_for_timestep , ratio_file,
-                    self.propensity_list, self.index,self.nearby, self.max_cells, pos_tmp_list))
+                    i_round, thread_no, self.generations, self.n_time_step, init_cell_of_thread, detail_file,self.detail_for_timestep , ratio_file,
+                    self.propensity_list, self.index,self.nearby, self.max_cells, pos_tmp_list,self.real_nearby))
                     self.threads.append(th)
 
                 for i in range(self.num_turns):
@@ -88,8 +90,8 @@ class Simulator(object):
                 detail_file.close()
                 ratio_file.close()
             else:
-                self.multi_thread_simulation(i_round,0,self.generations, N_STEP, self.init_cell,
-                                  detail_file, self.detail_for_timestep, ratio_file, self.propensity_list, self.index, nearby=self.nearby, max_cells= self.max_cells,index_pos_list=self.pos_list)
+                self.multi_thread_simulation(i_round,0,self.generations, self.n_time_step, self.init_cell,
+                                  detail_file, self.detail_for_timestep, ratio_file, self.propensity_list, self.index, nearby=self.nearby, max_cells= self.max_cells,index_pos_list=self.pos_list,real_nearby=self.real_nearby)
             endtime_a_round = datetime.datetime.now()
             print "One Round in " + str((endtime_a_round - starttime_a_round).seconds) + " seconds\n"
         endtime = datetime.datetime.now()
@@ -99,7 +101,7 @@ class Simulator(object):
         for item in list:
             print >> file, item
         self.lock.release()
-    def multi_thread_simulation(self, times_idx, thread_no, generations, n_time_step, init_cell, detail_file, detail_for_time_steps, ratio_file, propensity_list, exp_name, nearby=-1, max_cells=1000, index_pos_list=[]):
+    def multi_thread_simulation(self, times_idx, thread_no, generations, n_time_step, init_cell, detail_file, detail_for_time_steps, ratio_file, propensity_list, exp_name, nearby=-1, max_cells=1000, index_pos_list=[],real_nearby=False):
         print "%d round: Thread %d is started!" % (times_idx, thread_no)
         cell_collection = [init_cell]
 
@@ -122,9 +124,9 @@ class Simulator(object):
                 H_count_statistics.append([])
                 U_count_statistics.append([])
             M_count_statistics, H_count_statistics, U_count_statistics, out_detail_seq_arr, cell_collection, cells_wait_to_add = self.simulate_common(
-                cell_collection, n_time_step, propensity_list, M_count_statistics, H_count_statistics,
-                U_count_statistics, cells_wait_to_add, nearby, detail_for_time_steps,
-                index_pos_list=index_pos_list)
+                cell_collection=cell_collection, n_time_step=n_time_step, PROPENCITY_LIST=propensity_list,M_count_statistics= M_count_statistics, H_count_statistics=H_count_statistics,
+                U_count_statistics=U_count_statistics, cells_wait_to_add=cells_wait_to_add, nearby=nearby, detail_for_time_steps=detail_for_time_steps,
+                index_pos_list=index_pos_list,real_nearby=real_nearby)
 
             m_means_ratio = (np.mean(np.array(M_count_statistics), axis=1) / len(init_cell)).tolist()
             h_means_ratio = (np.mean(np.array(H_count_statistics), axis=1) / len(init_cell)).tolist()
@@ -159,7 +161,7 @@ class Simulator(object):
             times_idx, thread_no, exp_name, i, len(cell_collection), len(cells_wait_to_add), time_collapsed)
 
             cell_collection = cells_wait_to_add
-    def simulate_common(self,cell_collection,n_time_step,PROPENCITY_LIST,M_count_statistics,H_count_statistics,U_count_statistics,cells_wait_to_add,nearby,detail_for_time_steps=[],index_pos_list=[]):
+    def simulate_common(self,cell_collection,n_time_step,PROPENCITY_LIST,M_count_statistics,H_count_statistics,U_count_statistics,cells_wait_to_add,nearby,detail_for_time_steps=[],index_pos_list=[],real_nearby=False):
         out_detail_seq_arr=[]
         for idx,cell in enumerate(cell_collection): #loop cell in cell_collection
 
@@ -190,6 +192,9 @@ class Simulator(object):
                         col_site_pos = index_pos_list[col_CpG_site_index]
 
                         distance=int(math.fabs(pos_target-col_site_pos))
+
+                        if (real_nearby) == True and (distance > nearby):
+                            continue
                         reaction_ratio=self.phi(d=distance)
                         propensity_tmp=self.scale_propensity_list(reaction_ratio,PROPENCITY_LIST)
                     else:
@@ -752,7 +757,7 @@ def random_col_simulation(function_util):
     simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
                         calc_interval=calc_interval, ignore_d=ignore_d)
 def nearby_simulation(function_util):
-    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.005,H_plus_in=0.004,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.233,H_p_M_in=0.233,U_p_M_in=0.232,H_m_U_in=0.084,M_m_U_in=0.084)
+    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.005,H_plus_in=0.004,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.237,H_p_M_in=0.237,U_p_M_in=0.237,H_m_U_in=0.055,M_m_U_in=0.055)
 
     sim_rounds = range(1,3)
 
@@ -760,11 +765,19 @@ def nearby_simulation(function_util):
     NEARBY_OUTPUT_DIR = "data" + os.sep + nearby_index
 
     max_cpg_sites = 200
-    generations = 10
+    generations = 3
     multi_threads = True
-    nearby = 1
+    nearby = 3
+    real_nearby=True
+    n_time_step=1000
+
+
     max_cells = 2
-    detail_for_timestep = [0, 1, 2]
+    detail_for_timestep = []
+
+    for i in range (1,1000):
+        if i %10==0:
+            detail_for_timestep.append(i)
 
     geometric_p = 0.3
     plot = False
@@ -778,7 +791,7 @@ def nearby_simulation(function_util):
     simulator = Simulator(random_propensity_list, rounds=sim_rounds, out_dir=NEARBY_OUTPUT_DIR,
                       max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
                       multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
-                      index=nearby_index, detail_for_timestep=detail_for_timestep)
+                      index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step)
     simulator.run()
 
     sorted_ratio_dir_name = "sorted_ratio"
