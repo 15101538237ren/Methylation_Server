@@ -520,13 +520,12 @@ class Simulator(object):
             #计算相关性,将d和rd输出到文件中,d:2-corr_end
             if calc_interval==True:
                 out_R_d_with_interval_file_name=rd_with_dir+os.sep+"chr1_r_d_with_"+item_str+".csv"
-                calc_correlation(bed_input,out_R_d_with_interval_file_name,d_max,True,ignore_d)
+                self.calc_correlation(bed_input,out_R_d_with_interval_file_name,d_max,True,ignore_d)
             if ignore_d==True:
-                calc_correlation(bed_input,out_R_d_without_interval_file_name,d_max,True,True)
+                self.calc_correlation(bed_input,out_R_d_without_interval_file_name,d_max,True,True)
             else:
-                calc_correlation(bed_input,out_R_d_without_interval_file_name,d_max,False,False)
+                self.calc_correlation(bed_input,out_R_d_without_interval_file_name,d_max,False,False)
             print "now finished calc %s correlation!" % item
-
     def read_bed_file_and_store_pos_to_a_struct(self,bedfile_path, ignore_d=False):
         struct_to_store = {}
         bed_file = open(bedfile_path, 'r')
@@ -547,9 +546,7 @@ class Simulator(object):
         bed_file.close()
         # struct_to_store=sorted(struct_to_store.items(), key=lambda d:d[0])
         return struct_to_store
-
-    # 根据距离d筛选在hash表中存储的所有满足要求距离的CpG对,输出为[[a_1 a_2] [a_1' a_2']......]形式
-    def filter_d_length_to_generate_CpG_pairs(self,CpG_pos_and_methy_struct, d):
+    def filter_d_length_to_generate_CpG_pairs(self,CpG_pos_and_methy_struct, d): # 根据距离d筛选在hash表中存储的所有满足要求距离的CpG对,输出为[[a_1 a_2] [a_1' a_2']......]形式
         array_to_store_pairs = []
         for key in CpG_pos_and_methy_struct.keys():
             pos = key
@@ -559,9 +556,7 @@ class Simulator(object):
                 methy_level_2 = CpG_pos_and_methy_struct[pos_off_by_d]
                 array_to_store_pairs.append([methy_level_1, methy_level_2])
         return array_to_store_pairs
-
-    # 20160403修改版,d只统计两个cpg位点间没有其他位点,并且两位点距离为d的cpg_pairs
-    def filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(self,od, d, length_of_od, od_keys, od_vals):
+    def filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(self,d, length_of_od, od_keys, od_vals): # 20160403修改版,d只统计两个cpg位点间没有其他位点,并且两位点距离为d的cpg_pairs
         # 排好序的dict
         array_to_store_pairs = []
         # 只遍历到倒数第二个元素,否则+1就会出界
@@ -575,9 +570,7 @@ class Simulator(object):
                 methy_level_2 = od_vals[i + 1]
                 array_to_store_pairs.append([methy_level_1, methy_level_2])
         return array_to_store_pairs
-
-    # 根据第二种方法计算相关系数r(d)
-    def calc_C_d_by_pearson_correlation(self,CpG_pairs):
+    def calc_C_d_by_pearson_correlation(self,CpG_pairs): # 根据第二种方法计算相关系数r(d)
         sum_pre = 0.0
         sum_post = 0.0
         for pair in CpG_pairs:
@@ -615,9 +608,8 @@ class Simulator(object):
             if is_inter_with_other_cpg:
                 CpG_pairs = self.filter_d_length_to_generate_CpG_pairs(CpG_pos_and_methy_struct, d)
             else:
-                CpG_pairs = self.filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(sorted_struct, d, length_of_od,
+                CpG_pairs = self.filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(d, length_of_od,
                                                                                            od_keys, od_vals)
-            # out_file("cpg_pairs.csv",CpG_pairs)
             d_count = len(CpG_pairs)
             print "finish chr%s d=%d run , d_count=%d" % ("1", d, d_count)
             if len(CpG_pairs) == 0:
@@ -660,7 +652,7 @@ def traditional_simulation(function_util):
                           max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
                           multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
                           index=traditional_index, detail_for_timestep=detail_for_timestep)
-    #simulator.run()
+    simulator.run()
 
     sorted_ratio_dir_name="sorted_ratio"
     sorted_ratio_bk_dir_name="sorted_ratio_bk"
@@ -686,21 +678,22 @@ def traditional_simulation(function_util):
     calc_d_max=500 #计算的相关性最大距离
     calc_interval=False #是否包含中间的位点
     ignore_d=False #是否忽略位点间距离而计算相关性
-    list_gen = [simulator.rounds[len(simulator.rounds) - 1] + 0.01]
+    list_gen = remained_generations
     str_list_gen = []
     for item in list_gen:
+        item = str(item).replace(".", "_")
         str_list_gen.append(str(item))
 
     simulator.calc_corr(bed_files_dir,rd_with_dir,rd_without_dir,str_list_gen,calc_d_max,calc_interval=calc_interval,ignore_d=ignore_d)
 def random_col_simulation(function_util):
     random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.0005,H_plus_in=0.0005,M_minus_in=0.07,H_minus_in=0.069 ,H_p_H_in=0.22,H_p_M_in=0.22,U_p_M_in=0.23 ,H_m_U_in=0.072,M_m_U_in=0.06)
 
-    sim_rounds = range(1, 2)
+    sim_rounds = range(1, 3)
 
     random_index = "random_simulation"
     RANDOM_OUTPUT_DIR = "data" + os.sep + random_index
 
-    max_cpg_sites = 1000
+    max_cpg_sites = 10000
     generations = 10
     multi_threads = True
     nearby = -1
@@ -725,19 +718,107 @@ def random_col_simulation(function_util):
     sorted_ratio_dir_name = "sorted_ratio"
     sorted_ratio_bk_dir_name = "sorted_ratio_bk"
     sorted_detail_dir_name = "sorted_detail"
+    bed_files_dir_name = "bed_files"
+    rd_with_dir_name = "rd_with"
+    rd_without_dir_name = "rd_without"
 
     sorted_ratio_dir = RANDOM_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
     sorted_ratio_bk_dir = RANDOM_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
     sort_detail_dir = RANDOM_OUTPUT_DIR + os.sep + sorted_detail_dir_name
+    bed_files_dir = RANDOM_OUTPUT_DIR + os.sep + bed_files_dir_name
+    rd_with_dir = RANDOM_OUTPUT_DIR + os.sep + rd_with_dir_name
+    rd_without_dir = RANDOM_OUTPUT_DIR + os.sep + rd_without_dir_name
 
-    simulator.sort_the_simulaiton_result(RANDOM_OUTPUT_DIR, sorted_ratio_dir, sort_detail_dir, simulator.rounds[0],
-                                         simulator.rounds[len(simulator.rounds) - 1], [], False)
+    simulator.sort_the_simulaiton_result(RANDOM_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
+    shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
+    filter_bounds = simulator.set_filter_range_bounds(m_down=0.10, m_up=0.28, h_down=0.30, h_up=0.55, u_down=0.30,
+                                                      u_up=0.55)
 
-    list_gen=[simulator.rounds[len(simulator.rounds) - 1] + 0.01]
-    str_list_gen=[]
+    remained_generations = simulator.sort_the_simulaiton_result(RANDOM_OUTPUT_DIR, sorted_ratio_dir,
+                                                                sort_detail_dir, simulator.rounds[0],
+                                                                simulator.rounds[len(simulator.rounds) - 1], [], True,
+                                                                filter_bounds)  # filter the sort result according to the filter bound for m,h,u ratio
+    simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_generations)
+
+    calc_d_max = 300  # 计算的相关性最大距离
+    calc_interval = False  # 是否包含中间的位点
+    ignore_d = False  # 是否忽略位点间距离而计算相关性
+    list_gen = remained_generations
+    str_list_gen = []
     for item in list_gen:
-        str_list_gen.append(str(list_gen))
+        item = str(item).replace(".", "_")
+        str_list_gen.append(str(item))
+
+    simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
+                        calc_interval=calc_interval, ignore_d=ignore_d)
+def nearby_simulation(function_util):
+    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.005,H_plus_in=0.004,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.233,H_p_M_in=0.233,U_p_M_in=0.232,H_m_U_in=0.084,M_m_U_in=0.084)
+
+    sim_rounds = range(1,3)
+
+    nearby_index = "nearby_simulation_try2"
+    NEARBY_OUTPUT_DIR = "data" + os.sep + nearby_index
+
+    max_cpg_sites = 200
+    generations = 10
+    multi_threads = True
+    nearby = 1
+    max_cells = 2
+    detail_for_timestep = [0, 1, 2]
+
+    geometric_p = 0.3
+    plot = False
+    cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
+                                                                                     plot=plot)
+    m_ratio = 0.181214  # the site origin ratio
+    h_ratio = 0.427782
+    u_ratio = 0.391004
+
+    init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
+    simulator = Simulator(random_propensity_list, rounds=sim_rounds, out_dir=NEARBY_OUTPUT_DIR,
+                      max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
+                      multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
+                      index=nearby_index, detail_for_timestep=detail_for_timestep)
+    simulator.run()
+
+    sorted_ratio_dir_name = "sorted_ratio"
+    sorted_ratio_bk_dir_name = "sorted_ratio_bk"
+    sorted_detail_dir_name = "sorted_detail"
+    bed_files_dir_name = "bed_files"
+    rd_with_dir_name = "rd_with"
+    rd_without_dir_name = "rd_without"
+
+    sorted_ratio_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
+    sorted_ratio_bk_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
+    sort_detail_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_detail_dir_name
+    bed_files_dir = NEARBY_OUTPUT_DIR + os.sep + bed_files_dir_name
+    rd_with_dir = NEARBY_OUTPUT_DIR + os.sep + rd_with_dir_name
+    rd_without_dir = NEARBY_OUTPUT_DIR + os.sep + rd_without_dir_name
+
+    simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
+    #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
+    filter_bounds = simulator.set_filter_range_bounds(m_down=0.10, m_up=0.28, h_down=0.30, h_up=0.55, u_down=0.30,
+                                                      u_up=0.55)
+
+    remained_generations = simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR, sorted_ratio_dir,
+                                                                sort_detail_dir, simulator.rounds[0],
+                                                                simulator.rounds[len(simulator.rounds) - 1], [], True,
+                                                                filter_bounds)  # filter the sort result according to the filter bound for m,h,u ratio
+    simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_generations)
+
+    calc_d_max = 300  # 计算的相关性最大距离
+    calc_interval = False  # 是否包含中间的位点
+    ignore_d = False  # 是否忽略位点间距离而计算相关性
+    list_gen = remained_generations
+    str_list_gen = []
+    for item in list_gen:
+        item = str(item).replace(".", "_")
+        str_list_gen.append(str(item))
+
+    simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
+                        calc_interval=calc_interval, ignore_d=ignore_d)
 if __name__ == '__main__':
     function_util = FunctionUtil()
-    traditional_simulation(function_util)
+    #traditional_simulation(function_util)
     #random_col_simulation(function_util)
+    nearby_simulation(function_util)
