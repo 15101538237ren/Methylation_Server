@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import random,math,os,threading,datetime,re,shutil
+import random,math,os,threading,datetime,re,shutil,collections
 import numpy as np
 from FunctionUtil import FunctionUtil
 
@@ -503,12 +503,13 @@ class Simulator(object):
         if not os.path.exists(bed_dir):
             os.makedirs(bed_dir)
         self.convert_sorted_result_to_bed(pos_list, detail_dir, bed_dir, gens)
-    def calc_corr(self,bed_dir,rd_with_dir,rd_without_dir,gen_collection,corr_end,calc_interval=False,ignore_d=False):
+    def calc_corr(self,bed_dir,rd_with_dir,rd_without_dir,gen_collection,d_max,calc_interval=False,ignore_d=False):
         if calc_interval==True:
             if not os.path.exists(rd_with_dir):
                 os.makedirs(rd_with_dir)
-        if not os.path.exists(rd_without_dir):
-            os.makedirs(rd_without_dir)
+        else:
+            if not os.path.exists(rd_without_dir):
+                os.makedirs(rd_without_dir)
         for item in gen_collection:
             print "now calc %s correlation!" % item
             item_str=str(item).replace(".","_")
@@ -519,12 +520,116 @@ class Simulator(object):
             #计算相关性,将d和rd输出到文件中,d:2-corr_end
             if calc_interval==True:
                 out_R_d_with_interval_file_name=rd_with_dir+os.sep+"chr1_r_d_with_"+item_str+".csv"
-                calc_correlation(bed_input,out_R_d_with_interval_file_name,corr_end,True,ignore_d)
+                calc_correlation(bed_input,out_R_d_with_interval_file_name,d_max,True,ignore_d)
             if ignore_d==True:
-                calc_correlation(bed_input,out_R_d_without_interval_file_name,corr_end,True,ignore_d)
+                calc_correlation(bed_input,out_R_d_without_interval_file_name,d_max,True,True)
             else:
-                calc_correlation(bed_input,out_R_d_without_interval_file_name,corr_end,False,ignore_d)
+                calc_correlation(bed_input,out_R_d_without_interval_file_name,d_max,False,False)
             print "now finished calc %s correlation!" % item
+
+    def read_bed_file_and_store_pos_to_a_struct(self,bedfile_path, ignore_d=False):
+        struct_to_store = {}
+        bed_file = open(bedfile_path, 'r')
+        re_pattern = r'(\d+)\s([\d]+\.[\d]*)\s'
+        line = bed_file.readline()
+        index = 0
+        while line:
+            match = re.search(re_pattern, line)
+            if match:
+                index = index + 1
+                if ignore_d == True:
+                    pos = index
+                else:
+                    pos = int(match.group(1))
+                methy_level = float(match.group(2))
+                struct_to_store[pos] = methy_level
+            line = bed_file.readline()
+        bed_file.close()
+        # struct_to_store=sorted(struct_to_store.items(), key=lambda d:d[0])
+        return struct_to_store
+
+    # 根据距离d筛选在hash表中存储的所有满足要求距离的CpG对,输出为[[a_1 a_2] [a_1' a_2']......]形式
+    def filter_d_length_to_generate_CpG_pairs(self,CpG_pos_and_methy_struct, d):
+        array_to_store_pairs = []
+        for key in CpG_pos_and_methy_struct.keys():
+            pos = key
+            methy_level_1 = CpG_pos_and_methy_struct[key]
+            pos_off_by_d = pos + d
+            if CpG_pos_and_methy_struct.has_key(pos_off_by_d):
+                methy_level_2 = CpG_pos_and_methy_struct[pos_off_by_d]
+                array_to_store_pairs.append([methy_level_1, methy_level_2])
+        return array_to_store_pairs
+
+    # 20160403修改版,d只统计两个cpg位点间没有其他位点,并且两位点距离为d的cpg_pairs
+    def filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(self,od, d, length_of_od, od_keys, od_vals):
+        # 排好序的dict
+        array_to_store_pairs = []
+        # 只遍历到倒数第二个元素,否则+1就会出界
+        for i in range(0, length_of_od - 1):
+            # 后一个位点与前一个位点之间的距离为d
+            pre_od_key = od_keys[i]
+            post_od_key = od_keys[i + 1]
+            # print "now d:%d,now i%d of len:%d" %(d,i,length_of_od)
+            if pre_od_key + d == post_od_key:
+                methy_level_1 = od_vals[i]
+                methy_level_2 = od_vals[i + 1]
+                array_to_store_pairs.append([methy_level_1, methy_level_2])
+        return array_to_store_pairs
+
+    # 根据第二种方法计算相关系数r(d)
+    def calc_C_d_by_pearson_correlation(self,CpG_pairs):
+        sum_pre = 0.0
+        sum_post = 0.0
+        for pair in CpG_pairs:
+            sum_pre = sum_pre + pair[0]
+            sum_post = sum_post + pair[1]
+        length = len(CpG_pairs)
+        mean_1 = sum_pre / length
+        mean_2 = sum_post / length
+
+        sum_up = 0.0
+        sum_down_left = 0.0
+        sum_down_right = 0.0
+        for pair in CpG_pairs:
+            X_i = pair[0]
+            Y_i = pair[1]
+            sum_up = sum_up + (X_i - mean_1) * (Y_i - mean_2)
+            sum_down_left = sum_down_left + (X_i - mean_1) * (X_i - mean_1)
+            sum_down_right = sum_down_right + (Y_i - mean_2) * (Y_i - mean_2)
+        sum_down = math.sqrt(sum_down_left * sum_down_right)
+        if sum_down == 0:
+            return -1
+        r_d = sum_up / sum_down
+        return r_d
+    def calc_correlation(self,bed_file_path, out_R_d_file_path, d_max, is_inter_with_other_cpg, ignore_d=False):
+        CpG_pos_and_methy_struct = self.read_bed_file_and_store_pos_to_a_struct(bed_file_path, ignore_d)
+        # 要计算的d的范围
+        d_list = range(2, d_max)
+        out_R_d_file = open(out_R_d_file_path, 'w')
+        sorted_struct = collections.OrderedDict(sorted(CpG_pos_and_methy_struct.items()))
+        od_keys = sorted_struct.keys()
+        od_vals = sorted_struct.values()
+        length_of_od = len(sorted_struct)
+
+        for d in d_list:
+            if is_inter_with_other_cpg:
+                CpG_pairs = self.filter_d_length_to_generate_CpG_pairs(CpG_pos_and_methy_struct, d)
+            else:
+                CpG_pairs = self.filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(sorted_struct, d, length_of_od,
+                                                                                           od_keys, od_vals)
+            # out_file("cpg_pairs.csv",CpG_pairs)
+            d_count = len(CpG_pairs)
+            print "finish chr%s d=%d run , d_count=%d" % ("1", d, d_count)
+            if len(CpG_pairs) == 0:
+                print "passed d=%d" % d
+                continue
+            r_d = self.calc_C_d_by_pearson_correlation(CpG_pairs)
+            if r_d != -1:
+                line2 = str(d) + "," + str(r_d) + "\n"
+                out_R_d_file.write(line2)
+                print "finish chr%s d=%d run , r_d=%f" % ("1", d, r_d)
+        out_R_d_file.close()
+
 def traditional_simulation(function_util):
     # traditional simulation
     traditional_propensity_list = function_util.set_standard_params(U_plus_in=0.05, H_plus_in=0.05, M_minus_in=0.05,
@@ -561,11 +666,15 @@ def traditional_simulation(function_util):
     sorted_ratio_bk_dir_name="sorted_ratio_bk"
     sorted_detail_dir_name="sorted_detail"
     bed_files_dir_name="bed_files"
+    rd_with_dir_name="rd_with"
+    rd_without_dir_name = "rd_without"
 
     sorted_ratio_dir = TRADITIONAL_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
     sorted_ratio_bk_dir = TRADITIONAL_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
     sort_detail_dir = TRADITIONAL_OUTPUT_DIR + os.sep + sorted_detail_dir_name
     bed_files_dir = TRADITIONAL_OUTPUT_DIR + os.sep + bed_files_dir_name
+    rd_with_dir = TRADITIONAL_OUTPUT_DIR + os.sep + rd_with_dir_name
+    rd_without_dir = TRADITIONAL_OUTPUT_DIR + os.sep + rd_without_dir_name
 
     simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
     shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
@@ -573,7 +682,16 @@ def traditional_simulation(function_util):
 
     remained_generations=simulator.sort_the_simulaiton_result(TRADITIONAL_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], True,filter_bounds) # filter the sort result according to the filter bound for m,h,u ratio
     simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_generations)
-    simulator.calc_corr(bed_files_dir,rd_with_dir,rd_without_ignore_d_dir,str_list_gen,2000,calc_interval=False,ignore_d=False)
+
+    calc_d_max=500 #计算的相关性最大距离
+    calc_interval=False #是否包含中间的位点
+    ignore_d=False #是否忽略位点间距离而计算相关性
+    list_gen = [simulator.rounds[len(simulator.rounds) - 1] + 0.01]
+    str_list_gen = []
+    for item in list_gen:
+        str_list_gen.append(str(item))
+
+    simulator.calc_corr(bed_files_dir,rd_with_dir,rd_without_dir,str_list_gen,calc_d_max,calc_interval=calc_interval,ignore_d=ignore_d)
 def random_col_simulation(function_util):
     random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.0005,H_plus_in=0.0005,M_minus_in=0.07,H_minus_in=0.069 ,H_p_H_in=0.22,H_p_M_in=0.22,U_p_M_in=0.23 ,H_m_U_in=0.072,M_m_U_in=0.06)
 
