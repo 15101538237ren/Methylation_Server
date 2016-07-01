@@ -626,7 +626,22 @@ class Simulator(object):
                 out_R_d_file.write(line2)
                 print "finish chr%s d=%d run , r_d=%f" % ("1", d, r_d)
         out_R_d_file.close()
+    def generate_param_file(self,out_file_path,propensity_list,collaborative=True):
 
+        out_file = open(out_file_path,'w')
+        str_to_write="u+: "+str(propensity_list[0])+"\n"\
+                     "h+: "+str(propensity_list[1])+"\n"\
+                     "m-: "+str(propensity_list[2])+"\n"\
+                     "h-: "+str(propensity_list[3])+"\n"
+        if collaborative==True:
+                str_to_write=str_to_write+"h+h: "+str(propensity_list[4])+"\n"\
+                             "h+m: "+str(propensity_list[5])+"\n"\
+                             "u+m: "+str(propensity_list[6])+"\n"\
+                             "h-u: "+str(propensity_list[7])+"\n"\
+                             "m-u: "+str(propensity_list[8])
+        out_file.write(str_to_write)
+        out_file.close()
+        print "%s generated successful!" % out_file_path
 def traditional_simulation(function_util):
     # traditional simulation
     traditional_propensity_list = function_util.set_standard_params(U_plus_in=0.05, H_plus_in=0.05, M_minus_in=0.05,
@@ -827,23 +842,23 @@ def fake_nearby_simulation(function_util):
     simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
                         calc_interval=calc_interval, ignore_d=ignore_d)
 def real_nearby_simulation(function_util):
-    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.005,H_plus_in=0.004,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.237,H_p_M_in=0.237,U_p_M_in=0.237,H_m_U_in=0.055,M_m_U_in=0.055)
+    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.012,H_plus_in=0.004,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.24,H_p_M_in=0.24,U_p_M_in=0.24,H_m_U_in=0.035,M_m_U_in=0.035)
 
-    sim_rounds = range(1,3)
+    sim_rounds = range(1,5)
 
-    nearby_index = "real_nearby_simulation_try2"
+    nearby_index = "real_nearby_simulation_try4"
     NEARBY_OUTPUT_DIR = "data" + os.sep + nearby_index
 
-    max_cpg_sites = 200
-    generations = 10
+    max_cpg_sites = 100
+    generations = 50
     multi_threads = True
-    nearby = 3
+    nearby = 5
     real_nearby=True
     n_time_step=100
 
 
     max_cells = 2
-    detail_for_timestep = range(99)
+    detail_for_timestep = range(1,99)
 
     geometric_p = 0.3
     plot = False
@@ -876,8 +891,8 @@ def real_nearby_simulation(function_util):
 
     simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
     shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
-    filter_bounds = simulator.set_filter_range_bounds(m_down=0.10, m_up=0.28, h_down=0.30, h_up=0.55, u_down=0.30,
-                                                      u_up=0.55)
+    filter_bounds = simulator.set_filter_range_bounds(m_down=0.10, m_up=0.5, h_down=0.20, h_up=0.7, u_down=0.30,
+                                                      u_up=0.7)
 
     remained_generations = simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR, sorted_ratio_dir,
                                                                 sort_detail_dir, simulator.rounds[0],
@@ -896,6 +911,9 @@ def real_nearby_simulation(function_util):
 
     simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
                         calc_interval=calc_interval, ignore_d=ignore_d)
+    param_file_path=NEARBY_OUTPUT_DIR+os.sep+"param.txt"
+    collaborative = True
+    simulator.generate_param_file(param_file_path,simulator.propensity_list,collaborative=collaborative)
 if __name__ == '__main__':
     function_util = FunctionUtil()
     #traditional_simulation(function_util)
