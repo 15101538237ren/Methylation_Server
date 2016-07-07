@@ -45,7 +45,17 @@ class FunctionUtil(object):
         return CpG_str
     def set_standard_params(self,U_plus_in,H_plus_in,M_minus_in,H_minus_in):
         return [U_plus_in,H_plus_in,M_minus_in,H_minus_in]
-    def set_collaborative_params(self,U_plus_in, H_plus_in, M_minus_in, H_minus_in, H_p_H_in, H_p_M_in, U_p_M_in, H_m_U_in, M_m_U_in): # 设置协作反应的参数
+    def set_collaborative_params(self,**reaction_hash): # 设置协作反应的参数
+        U_plus_in=float(reaction_hash.get("U_plus_in",0.0))
+        H_plus_in=float(reaction_hash.get("H_plus_in",0.0))
+        M_minus_in=float(reaction_hash.get("M_minus_in",0.0))
+        H_minus_in=float(reaction_hash.get("H_minus_in",0.0))
+        H_p_H_in=float(reaction_hash.get("H_p_H_in",0.0))
+        H_p_M_in=float(reaction_hash.get("H_p_M_in",0.0))
+        U_p_M_in=float(reaction_hash.get("U_p_M_in",0.0))
+        H_m_U_in=float(reaction_hash.get("H_m_U_in",0.0))
+        M_m_U_in=float(reaction_hash.get("M_m_U_in",0.0))
+
         return [U_plus_in, H_plus_in, M_minus_in, H_minus_in, H_p_H_in, H_p_M_in, U_p_M_in, H_m_U_in, M_m_U_in]
 if __name__ == '__main__':
     #create function utility object
