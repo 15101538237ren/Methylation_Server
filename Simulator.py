@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import random,math,os,threading,datetime,re,shutil,collections
+import random,math,os,threading,datetime,re,shutil,collections,pickle
 import numpy as np
 from FunctionUtil import FunctionUtil
 
@@ -845,7 +845,8 @@ def fake_nearby_simulation(function_util):
     simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
                         calc_interval=calc_interval, ignore_d=ignore_d)
 def real_nearby_simulation(function_util):
-    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.012,H_plus_in=0.008,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.24,H_p_M_in=0.24,U_p_M_in=0.24,H_m_U_in=0.032,M_m_U_in=0.032)
+    #random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.012,H_plus_in=0.008,M_minus_in=0.037,H_minus_in=0.034,H_p_H_in=0.24,H_p_M_in=0.24,U_p_M_in=0.24,H_m_U_in=0.032,M_m_U_in=0.032)
+    random_propensity_list = function_util.set_collaborative_params(U_plus_in=0.01,H_plus_in=0.01,M_minus_in=0.01,H_minus_in=0.01,H_p_H_in=0.24,H_p_M_in=0.24,U_p_M_in=0.24,H_m_U_in=0.032,M_m_U_in=0.032)
 
     sim_rounds = range(1,5)
 
@@ -862,69 +863,220 @@ def real_nearby_simulation(function_util):
 
     geometric_p = 0.3
     plot = False
-    replication_times=20
+    partial=20
     m_ratio = 0.181214  # the site origin ratio
     h_ratio = 0.427782
     u_ratio = 0.391004
+    partial_max_range=0
+    
+    rep_times=10
+    for rep_i in range(1,rep_times+1):
 
-    for rep_i in range(6,10+1):
-        nearby_index = "real_nearby_simulation_normal_"+str(rep_i)
-        NEARBY_OUTPUT_DIR = "data" + os.sep+"real_nearby"+os.sep + nearby_index
-        phi=float(rep_i)*(1.0/replication_times)
+        for partial_i in range(0,partial_max_range+1):
+            nearby_index = "real_nearby_simulation_normal_"+str(partial_i)
+            NEARBY_OUTPUT_DIR = "data" + os.sep+"real_nearby_"+str(rep_i)+os.sep + nearby_index
+            phi=float(partial_i)*(1.0/partial)
 
-        cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
-                                                                                         plot=plot)
+            cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
+                                                                                             plot=plot)
 
-        init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
-        simulator = Simulator(random_propensity_list, rounds=sim_rounds, out_dir=NEARBY_OUTPUT_DIR,
-                          max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
-                          multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
-                          index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi)
-        simulator.run()
+            init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
+            simulator = Simulator(random_propensity_list, rounds=sim_rounds, out_dir=NEARBY_OUTPUT_DIR,
+                              max_cpg_sites=max_cpg_sites, generations=generations, pos_list=pos_list,
+                              multi_threads=multi_threads, init_cell=init_cell, nearby=nearby, max_cells=max_cells,
+                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi)
+            simulator.run()
 
-        sorted_ratio_dir_name = "sorted_ratio"
-        sorted_ratio_bk_dir_name = "sorted_ratio_bk"
-        sorted_detail_dir_name = "sorted_detail"
-        bed_files_dir_name = "bed_files"
-        rd_with_dir_name = "rd_with"
-        rd_without_dir_name = "rd_without"
+            sorted_ratio_dir_name = "sorted_ratio"
+            sorted_ratio_bk_dir_name = "sorted_ratio_bk"
+            sorted_detail_dir_name = "sorted_detail"
+            bed_files_dir_name = "bed_files"
+            rd_with_dir_name = "rd_with"
+            rd_without_dir_name = "rd_without"
 
-        sorted_ratio_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
-        sorted_ratio_bk_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
-        sort_detail_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_detail_dir_name
-        bed_files_dir = NEARBY_OUTPUT_DIR + os.sep + bed_files_dir_name
-        rd_with_dir = NEARBY_OUTPUT_DIR + os.sep + rd_with_dir_name
-        rd_without_dir = NEARBY_OUTPUT_DIR + os.sep + rd_without_dir_name
+            sorted_ratio_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_ratio_dir_name
+            sorted_ratio_bk_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
+            sort_detail_dir = NEARBY_OUTPUT_DIR + os.sep + sorted_detail_dir_name
+            bed_files_dir = NEARBY_OUTPUT_DIR + os.sep + bed_files_dir_name
+            rd_with_dir = NEARBY_OUTPUT_DIR + os.sep + rd_with_dir_name
+            rd_without_dir = NEARBY_OUTPUT_DIR + os.sep + rd_without_dir_name
 
-        simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
-        shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
-        filter_bounds = simulator.set_filter_range_bounds(m_down=0.10, m_up=0.9, h_down=0.10, h_up=0.9, u_down=0.10,
-                                                          u_up=0.9)
+            simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
+            shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
+            filter_bounds = simulator.set_filter_range_bounds(m_down=0.10, m_up=0.9, h_down=0.10, h_up=0.9, u_down=0.10,
+                                                              u_up=0.9)
 
-        remained_generations = simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR, sorted_ratio_dir,
-                                                                    sort_detail_dir, simulator.rounds[0],
-                                                                    simulator.rounds[len(simulator.rounds) - 1], [], True,
-                                                                    filter_bounds)  # filter the sort result according to the filter bound for m,h,u ratio
-        simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_generations)
+            remained_generations = simulator.sort_the_simulaiton_result(NEARBY_OUTPUT_DIR, sorted_ratio_dir,
+                                                                        sort_detail_dir, simulator.rounds[0],
+                                                                        simulator.rounds[len(simulator.rounds) - 1], [], True,
+                                                                        filter_bounds)  # filter the sort result according to the filter bound for m,h,u ratio
+            simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_generations)
 
-        calc_d_max = 20  # 计算的相关性最大距离
-        calc_interval = False  # 是否包含中间的位点
-        ignore_d = False  # 是否忽略位点间距离而计算相关性
-        list_gen = remained_generations
-        str_list_gen = []
-        for item in list_gen:
-            item = str(item).replace(".", "_")
-            str_list_gen.append(str(item))
+            calc_d_max = 20  # 计算的相关性最大距离
+            calc_interval = False  # 是否包含中间的位点
+            ignore_d = False  # 是否忽略位点间距离而计算相关性
+            list_gen = remained_generations
+            str_list_gen = []
+            for item in list_gen:
+                if item > 25.0:
+                    item = str(item).replace(".", "_")
+                    str_list_gen.append(str(item))
 
-        simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
-                            calc_interval=calc_interval, ignore_d=ignore_d)
+            simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
+                                calc_interval=calc_interval, ignore_d=ignore_d)
 
     param_file_path=NEARBY_OUTPUT_DIR+os.sep+"param.txt"
     collaborative = True
     simulator.generate_param_file(param_file_path,simulator.propensity_list,collaborative=collaborative)
+def get_rd_array(input_dir,rep=10,partial=20,gen_range=range(46,50)):
+    rd_array=[]
+    for j in range(partial+1):
+        rd_array.append([])
+        for i in range(rep+1):
+            rd_array[j].append({})
+            for k in gen_range:
+                rd_array[j][i][k]=[]
+    for i in range(1,rep+1):
+        first_name="real_nearby_"+str(i)
+        for j in range(partial+1):
+            print "rep %d, partial %d" %(i,j)
+            second_name="real_nearby_simulation_normal_"+str(j)
+            third_name="rd_without"
+            for k in gen_range:
+                for l in range(1,99):
+                    end_name="chr1_r_d_without_"+str(k)+"_"+str(l)+".csv"
+                    full_path=input_dir+os.sep+first_name+os.sep+second_name+os.sep+third_name+os.sep+end_name
+                    if os.path.exists(full_path):
+                        rd_file=open(full_path,"r")
+                        line=rd_file.readline()
+                        line_arr=line.split(",")
+                        if line_arr[0]=="2":
+                            rd_array[j][i][k].append(float(line_arr[1]))
+                        rd_file.close()
+    return rd_array
+def store_rd_result():
+    output_pickle_path="data"+os.sep+"rd_result.pkl"
+    output_pickle = open(output_pickle_path, 'wb')
+
+    rep_times=10
+    partial_times=20
+    gen_range=range(40,50)
+    rd_array=get_rd_array("data",rep=rep_times,partial=partial_times,gen_range=gen_range)
+
+    pickle.dump(rd_array,output_pickle,-1)
+    print "dump completed!"
+    output_pickle.close()
+def load_rd_result():
+    input_pickle_path="data"+os.sep+"rd_result.pkl"
+    input_pickle = open(input_pickle_path, 'rb')
+
+    rd_array=pickle.load(input_pickle)
+    print "dump readed!"
+    input_pickle.close()
+    return rd_array
+def calc_mean_rd_with_phi_in_range(rd_array,rep=10,partial=20,gen_range=range(46,50)):
+    rd_mean_list=[]
+    rd_median_list=[]
+    rd_sum={}
+    rd_calc_list={}
+    rd_count={}
+    for j in range(partial+1):
+        rd_count[j]=0
+        rd_sum[j]=0.0
+        rd_calc_list[j]=[]
+        for i in range(1,rep+1):
+            for gen in gen_range:
+                if gen in rd_array[j][i].keys():
+                    list_base_gen=rd_array[j][i][gen]
+                    if len(list_base_gen):
+                        for val in list_base_gen:
+                            rd_count[j]=rd_count[j]+1
+                            rd_sum[j]=rd_sum[j]+val
+                            rd_calc_list[j].append(val)
+        if rd_count[j]>10 and median(rd_calc_list[j]) >0.0:
+            j_median=median(rd_calc_list[j])
+            rd_median_list.append(j_median)
+
+            j_mean=rd_sum[j]/float(rd_count[j])
+            rd_mean_list.append(j_mean)
+        else:
+            print "range is too small!"
+            break
+    return rd_mean_list,rd_median_list
+def calc_mean_rd_with_phi(rd_array,rep=10,partial=20,gen_range=range(46,50),base_gen=49):
+    rd_mean_list=[]
+    rd_median_list=[]
+    rd_sum={}
+    rd_calc_list={}
+    rd_count={}
+    tmp_base_gen=base_gen
+    j=0
+    while j<=partial:
+        rd_count[j]=0
+        rd_sum[j]=0.0
+        rd_calc_list[j]=[]
+        for i in range(1,rep+1):
+            if tmp_base_gen in rd_array[j][i].keys():
+                list_base_gen=rd_array[j][i][tmp_base_gen]
+                if len(list_base_gen):
+                    for val in list_base_gen:
+                        rd_count[j]=rd_count[j]+1
+                        rd_sum[j]=rd_sum[j]+val
+                        rd_calc_list[j].append(val)
+        if rd_count[j]>10 and median(rd_calc_list[j]) >0.0:
+            j_median=median(rd_calc_list[j])
+            rd_median_list.append(j_median)
+
+            j_mean=rd_sum[j]/float(rd_count[j])
+            rd_mean_list.append(j_mean)
+            tmp_base_gen=base_gen
+            j=j+1
+        else:
+            tmp_base_gen=tmp_base_gen-1
+            rd_count[j]=0
+            rd_sum[j]=0.0
+            rd_calc_list[j]=[]
+    return rd_mean_list,rd_median_list
+def median(lst):
+    if not lst:
+        return
+    lst=sorted(lst)
+    if len(lst)%2==1:
+        return lst[len(lst)/2]
+    else:
+        return  (lst[len(lst)/2-1]+lst[len(lst)/2])/2.0
+def get_mean_rd():
+    rd_array=load_rd_result()
+    rep_times=10
+    partial_times=20
+    gen_range=range(41,50)
+    base_gen=49
+    rd_mean_list,rd_median_list=calc_mean_rd_with_phi(rd_array,rep=rep_times,partial=partial_times,gen_range=gen_range,base_gen=base_gen)
+    #rd_mean_list,rd_median_list=calc_mean_rd_with_phi_in_range(rd_array,rep=rep_times,partial=partial_times,gen_range=gen_range)
+    out_mean_file_path="data"+os.sep+"mean_of_49.csv"
+    out_median_file_path="data"+os.sep+"median_of_49.csv"
+    out_mean_file=open(out_mean_file_path,"w")
+    out_median_file=open(out_median_file_path,"w")
+
+    print "mean result!"
+    for index,rd_mean in enumerate(rd_mean_list):
+        ratio=(index)/float(partial_times)
+        print "%f %f" %(ratio,rd_mean)
+        wrt_str=str(round(ratio,2))+","+str(rd_mean)+"\n"
+        out_mean_file.write(wrt_str)
+    out_mean_file.close()
+    print "median result!"
+    for index,rd_median in enumerate(rd_median_list):
+        ratio=(index)/float(partial_times)
+        print "%f %f" %(ratio,rd_median)
+        wrt_str=str(round(ratio,2))+","+str(rd_median)+"\n"
+        out_median_file.write(wrt_str)
+    out_median_file.close()
 if __name__ == '__main__':
     function_util = FunctionUtil()
     #traditional_simulation(function_util)
     #random_col_simulation(function_util)
     real_nearby_simulation(function_util)
     #fake_nearby_simulation(function_util)
+    #store_rd_result()
+    #get_mean_rd()
