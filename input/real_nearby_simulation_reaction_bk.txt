@@ -1,7 +1,7 @@
-U_plus_in=0.008
+U_plus_in=0.012
 H_plus_in=0.008
-M_minus_in=0.02
-H_minus_in=0.02
+M_minus_in=0.037
+H_minus_in=0.034
 H_p_H_in=0.24
 H_p_M_in=0.24
 U_p_M_in=0.24

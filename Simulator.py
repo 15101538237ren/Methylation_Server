@@ -322,7 +322,7 @@ class Simulator(object):
                     cell1 = cell1 + "U"
                     cell2 = cell2 + "H"
         return [cell1, cell2]
-    
+
     def sort_the_simulaiton_result(self,base_dir,sorted_ratio_dir,sort_detail_dir,start_round,end_round,excepts_rounds=[],is_filter=False,filter_bounds=[]):# 对多线程的模拟结果进行排序整合成按照generation的统计文件,见sorted_ratio/和sorted_detail文件夹
         if not os.path.exists(sorted_ratio_dir):
             os.makedirs(sorted_ratio_dir)
@@ -717,7 +717,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
     rd_with_dir_name =str(param_hash.get("rd_with_dir_name")).replace("\"","")
     rd_without_dir_name = str(param_hash.get("rd_without_dir_name")).replace("\"","")
 
-    dirs_to_delete=[sorted_detail_dir_name,bed_files_dir_name,sorted_ratio_dir_name,sorted_ratio_bk_dir_name]
+    dirs_to_delete=[sorted_detail_dir_name,sorted_ratio_dir_name,bed_files_dir_name,sorted_ratio_bk_dir_name]
     for rep_i in range(repeat_start,repeat_end+1):
 
         for partial_i in range(partial_start,partial_end+1):
@@ -749,7 +749,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
             rd_without_dir = OUTPUT_DIR + os.sep + rd_without_dir_name
 
             simulator.sort_the_simulaiton_result(OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
-            shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
+            #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
             filter_bounds = simulator.set_filter_range_bounds(m_down=float(param_hash.get("m_down")), m_up=float(param_hash.get("m_up")), h_down=float(param_hash.get("h_down")), h_up=float(param_hash.get("h_up")), u_down=float(param_hash.get("u_down")),
                                                               u_up=float(param_hash.get("u_up")))
 
@@ -762,8 +762,12 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
             calc_d_max = int(param_hash.get("calc_d_max"))  # 计算的相关性最大距离
             ignore_d = param_hash.get("ignore_d") == str(True)  # 是否忽略位点间距离而计算相关性
             list_gen = remained_generations
-            remained_gen_filter_left=float(param_hash.get("remained_gen_filter_left"))
-            remained_gen_filter_right=float(param_hash.get("remained_gen_filter_right"))
+            if partial_i >= 5:
+                remained_gen_filter_left=float(param_hash.get("remained_gen_filter_left"))
+                remained_gen_filter_right=float(param_hash.get("remained_gen_filter_right"))
+            else:
+                remained_gen_filter_left=20
+                remained_gen_filter_right=float(param_hash.get("remained_gen_filter_right"))
             str_list_gen = []
             for item in list_gen:
                 if (item > remained_gen_filter_left) and (item < remained_gen_filter_right):
@@ -795,15 +799,17 @@ def remove_dirs(root,file_start_with_list=[],dirs_start_with_list=[]):
                         print file_path+" removed!"
 def get_rd_array(OUTPUT_DIR_first,OUTPUT_DIR_second_pre,index_pre_path,rep=range(10),partial=range(20),gen_range=range(46,50),detail_range=range(100),rd_file_pre="rd_",rd_dir_name="rd_without",rd_cared_d=2):
     rd_array=[]
-    for j in partial:
+    arr_len=partial[len(partial)-1]
+    hash_len=rep[len(rep)-1]
+    for j in range(0,arr_len+1):
         rd_array.append([])
-        for i in rep:
+        for i in range(0,hash_len+1):
             rd_array[j].append({})
             for k in gen_range:
                 rd_array[j][i][k]=[]
-    for i in rep:
+    for i in range(0,hash_len+1):
         first_name=OUTPUT_DIR_second_pre+str(i)
-        for j in partial:
+        for j in range(0,arr_len+1):
             print "rep %d, partial %d" %(i,j)
             second_name=index_pre_path+str(j)
             third_name=rd_dir_name
@@ -820,7 +826,8 @@ def get_rd_array(OUTPUT_DIR_first,OUTPUT_DIR_second_pre,index_pre_path,rep=range
                         rd_file.close()
     return rd_array
 def store_rd_result(**param_hash):
-    output_pickle_path=str(param_hash.get("pickle_path")).replace("\"","")
+    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
+    output_pickle_path=OUTPUT_DIR_first+os.sep+str(param_hash.get("pickle_path")).replace("\"","")
     print "dump start!"
     output_pickle = open(output_pickle_path, 'wb')
 
@@ -855,24 +862,25 @@ def store_rd_result(**param_hash):
     print "dump completed!"
     output_pickle.close()
 def load_rd_result(**param_hash):
-    input_pickle_path=str(param_hash.get("pickle_path")).replace("\"","")
+    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
+    input_pickle_path=OUTPUT_DIR_first+os.sep+str(param_hash.get("pickle_path")).replace("\"","")
     input_pickle = open(input_pickle_path, 'rb')
 
     rd_array=pickle.load(input_pickle)
     print "dump readed!"
     input_pickle.close()
     return rd_array
-def calc_mean_rd_with_phi_in_range(rd_array,rep=10,partial=20,gen_range=range(46,50)):
+def calc_mean_rd_with_phi_in_range(rd_array,rep=range(10),partial=range(20),gen_range=range(46,50),rd_min_count=10):
     rd_mean_list=[]
     rd_median_list=[]
     rd_sum={}
     rd_calc_list={}
     rd_count={}
-    for j in range(partial+1):
+    for j in partial:
         rd_count[j]=0
         rd_sum[j]=0.0
         rd_calc_list[j]=[]
-        for i in range(1,rep+1):
+        for i in rep:
             for gen in gen_range:
                 if gen in rd_array[j][i].keys():
                     list_base_gen=rd_array[j][i][gen]
@@ -881,7 +889,7 @@ def calc_mean_rd_with_phi_in_range(rd_array,rep=10,partial=20,gen_range=range(46
                             rd_count[j]=rd_count[j]+1
                             rd_sum[j]=rd_sum[j]+val
                             rd_calc_list[j].append(val)
-        if rd_count[j]>10 and median(rd_calc_list[j]) >0.0:
+        if rd_count[j] > rd_min_count:# and median(rd_calc_list[j]) >0.0:
             j_median=median(rd_calc_list[j])
             rd_median_list.append(j_median)
 
@@ -911,7 +919,7 @@ def calc_mean_rd_with_phi(rd_array,rep=range(10),partial=range(20),base_rd_gen=4
                         rd_count[j]=rd_count[j]+1
                         rd_sum[j]=rd_sum[j]+val
                         rd_calc_list[j].append(val)
-        if rd_count[j] > rd_min_count:
+        if rd_count[j] > rd_min_count and median(rd_calc_list[j]) >0.0:
             j_median=median(rd_calc_list[j])
             rd_median_list.append(j_median)
 
@@ -935,7 +943,7 @@ def median(lst):
         return  (lst[len(lst)/2-1]+lst[len(lst)/2])/2.0
 def get_mean_rd(**param_hash):
     rd_array=load_rd_result(**param_hash)
-    partial=int(param_hash.get("partial"))
+    partial_count=int(param_hash.get("partial"))
     partial_start=int(param_hash.get("partial_start"))
     partial_end=int(param_hash.get("partial_end"))
 
@@ -950,23 +958,24 @@ def get_mean_rd(**param_hash):
     gen_range=range(rd_gen_start,rd_gen_end+1)
     base_rd_gen=int(param_hash.get("base_rd_gen"))
     rd_min_count=int(param_hash.get("rd_min_count"))
-    rd_mean_list,rd_median_list=calc_mean_rd_with_phi(rd_array,rep=rep,partial=partial,base_rd_gen=base_rd_gen,rd_min_count=rd_min_count)
-    #rd_mean_list,rd_median_list=calc_mean_rd_with_phi_in_range(rd_array,rep=rep_times,partial=partial_times,gen_range=gen_range)
-    out_mean_file_path="data"+os.sep+"mean_of_49.csv"
-    out_median_file_path="data"+os.sep+"median_of_49.csv"
+    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
+    #rd_mean_list,rd_median_list=calc_mean_rd_with_phi(rd_array,rep=rep,partial=partial,base_rd_gen=base_rd_gen,rd_min_count=rd_min_count)
+    rd_mean_list,rd_median_list=calc_mean_rd_with_phi_in_range(rd_array,rep=rep,partial=partial,gen_range=gen_range,rd_min_count=rd_min_count)
+    out_mean_file_path=OUTPUT_DIR_first+os.sep+"mean_of_47_49.csv"
+    out_median_file_path=OUTPUT_DIR_first+os.sep+"median_of_47_49.csv"
     out_mean_file=open(out_mean_file_path,"w")
     out_median_file=open(out_median_file_path,"w")
 
     print "mean result!"
     for index,rd_mean in enumerate(rd_mean_list):
-        ratio=(index)/float(partial)
+        ratio=(index)/float(partial_count)
         print "%f %f" %(ratio,rd_mean)
         wrt_str=str(round(ratio,2))+","+str(rd_mean)+"\n"
         out_mean_file.write(wrt_str)
     out_mean_file.close()
     print "median result!"
     for index,rd_median in enumerate(rd_median_list):
-        ratio=(index)/float(partial)
+        ratio=(index)/float(partial_count)
         print "%f %f" %(ratio,rd_median)
         wrt_str=str(round(ratio,2))+","+str(rd_median)+"\n"
         out_median_file.write(wrt_str)
@@ -992,8 +1001,7 @@ if __name__ == '__main__':
     reaction_param_file_path=param_base_path+"real_nearby_simulation_reaction.txt"
     reaction_param_file_for_0_path=param_base_path+"real_nearby_simulation_reaction_for_0.txt"
     param_hash=load_param_from_file(procedure_param_file_path)
-    #file_start_with_list=""
-    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
 
-    # store_rd_result(**param_hash)
-    # get_mean_rd(**param_hash)
+    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    #store_rd_result(**param_hash)
+    get_mean_rd(**param_hash)
