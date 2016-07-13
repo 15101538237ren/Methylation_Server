@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import random,math
+import random,re
 import numpy as np
 import matplotlib.pyplot as plt
 class FunctionUtil(object):
@@ -57,6 +57,28 @@ class FunctionUtil(object):
         M_m_U_in=float(reaction_hash.get("M_m_U_in",0.0))
 
         return [U_plus_in, H_plus_in, M_minus_in, H_minus_in, H_p_H_in, H_p_M_in, U_p_M_in, H_m_U_in, M_m_U_in]
+    def get_pos_list_from_bed_file(self,bed_file_path,max_cpg_sites):
+        methy_file = open(bed_file_path,'r')
+        #格式[[position methy_val],[position methy_val]]
+        pos_list=[]
+        line = methy_file.readline()
+        methy_patern=r'(\d+)(\s)([\d]+\.[\d]*)'
+        index=0
+        print "now reading bed file!"
+        while line:
+            if max_cpg_sites>0:
+                if index >= max_cpg_sites:
+                    break
+            match = re.search(methy_patern,line)
+            methy_pos=int(match.group(1))
+            line = methy_file.readline()
+            pos_list.append(methy_pos)
+            index=index+1
+            if not line:
+                break
+        methy_file.close()
+        return index,pos_list
+
 if __name__ == '__main__':
     #create function utility object
     function_util=FunctionUtil()
