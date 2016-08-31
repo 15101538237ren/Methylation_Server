@@ -19,7 +19,7 @@ class Simulator(object):
     '''
 
     # Construction function
-    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1,2],real_nearby=False,n_time_step=N_STEP,phi_param=1.0,pij_type="d_equal",d_limit2=10):
+    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1,2],real_nearby=False,n_time_step=N_STEP,phi_param=1.0,pij_type="d_equal",d_limit2=10,rd_data_name="",alpha_val=-1.0,pow_num=-1.0):
         #create the output dir
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
@@ -42,6 +42,7 @@ class Simulator(object):
         self.pij_type=pij_type
         self.random_site=random.randint(0,max_cpg_sites)
         self.d_limit1=self.nearby
+        self.rd_data_name=rd_data_name
         if self.pij_type=="d_range":
             self.d_limit2=d_limit2
         if self.multi_threads==True:
@@ -51,6 +52,10 @@ class Simulator(object):
             self.num_turns = int(math.ceil(float(self.num_of_threads) / self.max_threads)) # when the max_thread is not enough for one round simulation, split it in to num_turns
             self.threads = [] # thread array
             print "%d thread is needed!" % self.num_of_threads
+        if self.rd_data_name!="":
+            self.rd_hash=load_rd("input"+os.sep+rd_data_name)
+            self.alpha_val=alpha_val
+            self.pow_num=pow_num
     def run(self):
         starttime_new=datetime.datetime.now()
         for i_round in self.rounds:
@@ -199,14 +204,16 @@ class Simulator(object):
                         pos_target = index_pos_list[target_reaction_CpG_site]
                         col_site_pos = index_pos_list[col_CpG_site_index]
 
-                        distance=int(math.fabs(pos_target-col_site_pos))
+                        distance = int(math.fabs(pos_target-col_site_pos))
 
                         if (real_nearby) == True and (distance > nearby):
                             continue
-                        phi_d=self.phi(d=distance)
+                        if self.pij_type == "d_range" and distance not in range(self.d_limit1,self.d_limit2):
+                            continue
+                        phi_d = self.phi(d=distance)
 
                         pij=self.p_ij(col_site_pos,distance)
-                        propensity_tmp=self.calc_propensity_list(phi_d,PROPENCITY_LIST,pij,status_of_col_site,phi_d,phi_d)
+                        propensity_tmp = self.calc_propensity_list(phi_d , PROPENCITY_LIST,pij,status_of_col_site,phi_d , phi_d)
                     else:
                         propensity_tmp=PROPENCITY_LIST
 
@@ -275,7 +282,56 @@ class Simulator(object):
         return pij
     def set_phi(self,phi):
         self.phi_param = phi
-    def phi(self,d = 2): #the phi function which used for control the collaborative rate
+    def phi(self,d=2):
+        if self.rd_data_name!="":
+            rd_d = self.rd_hash[d]
+            divder = (1.0 - rd_d)
+            if math.fabs(divder) < math.pow(10, -5):
+                divder = divder + 0.001
+            base_nm = (rd_d * self.alpha_val) / divder
+            phi_val = math.pow(base_nm, self.pow_num)
+            return phi_val
+        else:
+            return 1.0
+    def phi_bk_now(self, d=2):
+        return 1.0
+    def phi_0_6(self,d = 2): #the phi function which used for control the collaborative rate
+        p1=0.5
+        a=10.3066
+        b=1.664
+        c=2.6561
+        p=0.25
+        omega=0.03
+        fi=2.6592
+        q=1.072
+        d=float(d)
+        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
+        return gd
+    def phi_0_5(self,d = 2): #the phi function which used for control the collaborative rate
+        p1=0.5
+        a=8.2061
+        b=1.664
+        c=3.3361
+        p=0.25
+        omega=0.03
+        fi=2.6592
+        q=1.072
+        d=float(d)
+        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
+        return gd
+    def phi_0_4(self,d = 2): #the phi function which used for control the collaborative rate
+        p1=0.5
+        a=6.2087
+        b=1.664
+        c=4.4093
+        p=0.25
+        omega=0.03
+        fi=2.6592
+        q=1.072
+        d=float(d)
+        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
+        return gd
+    def phi_0_8(self,d = 2): #the phi function which used for control the collaborative rate
         p1=0.5
         a=14.767
         b=1.664
@@ -711,7 +767,9 @@ def get_gens_in_dir(sorted_ratio_dir_path,sorted_detail_dir_path,gen_range,steps
                 gens_rtn.append(str(gen)+"_"+str(step))
     return gens_rtn
 def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash):
-
+    rd_data_name = str(param_hash.get("rd_data_name")).replace("\"", "")
+    alpha_val = float(param_hash.get("alpha_val",-2.0))
+    pow_num = float(param_hash.get("pow_num", -1.0))
 
     simulation_round_start=int(param_hash.get("simulation_round_start"))
     simulation_round_end=int(param_hash.get("simulation_round_end"))
@@ -794,7 +852,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
             simulator = Simulator(propensity_list, rounds=sim_rounds, out_dir=OUTPUT_DIR,
                               max_cpg_sites=max_cpg_sites, generations=number_of_generations, pos_list=pos_list,
                               multi_threads=multi_threads, init_cell=init_cell, nearby=nearby_distance, max_cells=max_cells,
-                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi,pij_type=pij_type,d_limit2=d_limit2)
+                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi,pij_type=pij_type,d_limit2=d_limit2,rd_data_name=rd_data_name,alpha_val=alpha_val,pow_num=pow_num)
             if not just_do_others:
                 simulator.run()
             if not just_simulate:
@@ -1085,6 +1143,27 @@ def calc_mean_rd_from_rd_dir(rd_dir,out_file_path):
         out_file.write(line_to_wrt)
     out_file.close()
     print "writing mean rd finished!"
+
+def load_rd(rd_file_path,length=0):
+    rd_file=open(rd_file_path,"r")
+    re_pattern = r'(\d+),([-]?[\d]+\.[\d]*)\s'
+    line = rd_file.readline()
+    rd_hash={}
+    counter=0
+    while line:
+        match = re.search(re_pattern, line)
+        if match:
+            counter = counter + 1
+            if length != 0 and counter > length:
+                break
+            d = int(match.group(1))
+            rd = float(match.group(2))
+            if rd < 0.0:
+                rd=0.001
+            rd_hash[d]=rd
+        line = rd_file.readline()
+    rd_file.close()
+    return rd_hash
 if __name__ == '__main__':
     function_util = FunctionUtil()
 
