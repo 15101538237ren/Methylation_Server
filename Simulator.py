@@ -203,7 +203,7 @@ class Simulator(object):
 
                         phi_d = self.phi(d=distance)
 
-                        pij = 1.0
+                        pij = 1.0 #若相邻则pij=1.0
                         propensity_tmp = self.calc_propensity_list(phi_d , PROPENCITY_LIST,pij,status_of_col_site,phi_d , phi_d)
                     else:
                         propensity_tmp=PROPENCITY_LIST
@@ -239,7 +239,7 @@ class Simulator(object):
                     u_count=cell_collection[idx].count("U")
                     U_count_statistics[j].append(u_count)
                 if len(detail_for_time_steps)!=0:
-                    if j in detail_for_time_steps:
+                    if j+1 in detail_for_time_steps:
                         out_detail_seq_arr[idx].append(cell_collection[idx])
             cell_of_source=cell_collection[idx]
             [cell1,cell2]=self.cell_division(cell_of_source)
@@ -763,7 +763,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
         for partial_i in range(partial_start,partial_end+1):
             nearby_index = str(param_hash.get("index_pre_path")).replace("\"","")+str(partial_i)
             OUTPUT_DIR = str(param_hash.get("OUTPUT_DIR_first")).replace("\"","") + os.sep+str(param_hash.get("OUTPUT_DIR_second_pre")).replace("\"","")+str(rep_i)+os.sep + nearby_index
-            phi=float(partial_i)*(partial_max/partial)
+            phi_param=float(partial_i)*(partial_max/partial)
 
             if partial_i==0:
                 reaction_hash=load_param_from_file(reaction_param_file_for_0_path)
@@ -794,7 +794,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
             simulator = Simulator(propensity_list, rounds=sim_rounds, out_dir=OUTPUT_DIR,
                               max_cpg_sites=max_cpg_sites, generations=number_of_generations, pos_list=pos_list,
                               multi_threads=multi_threads, init_cell=init_cell, nearby=nearby_distance, max_cells=max_cells,num_sites_per_thread=num_sites_per_thread,max_threads=max_threads,
-                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi,rd_data_name=rd_data_name,alpha_val=alpha_val,pow_num=pow_num)
+                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi_param,rd_data_name=rd_data_name,alpha_val=alpha_val,pow_num=pow_num)
             if just_simulate:
                 simulator.run()
             else:
@@ -894,10 +894,10 @@ def load_rd(rd_file_path,length=0):
     return rd_hash
 if __name__ == '__main__':
     function_util = FunctionUtil()
-    param_base_path="input_new"+os.sep
-    procedure_param_file_path=param_base_path+"phi_try_param.txt"
-    reaction_param_file_path=param_base_path+"phi_try_reaction.txt"
-    reaction_param_file_for_0_path=param_base_path+"phi_try_reaction_0.txt"
-    param_hash=load_param_from_file(procedure_param_file_path)
+    param_base_path = "input_new" + os.sep
+    procedure_param_file_path = param_base_path+"phi_try_param.txt"
+    reaction_param_file_path = param_base_path+"phi_try_reaction.txt"
+    reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
+    param_hash = load_param_from_file(procedure_param_file_path)
 
     start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
