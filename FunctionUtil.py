@@ -66,7 +66,12 @@ class FunctionUtil(object):
                 CpG_str += "H"
         # 返回生成的状态字符串,长度=CpG_sites_counts
         return CpG_str
-
+    def set_standard_params_from(self,**reaction_hash):
+        U_plus_in=float(reaction_hash.get("U_plus_in",0.0))
+        H_plus_in=float(reaction_hash.get("H_plus_in",0.0))
+        M_minus_in=float(reaction_hash.get("M_minus_in",0.0))
+        H_minus_in=float(reaction_hash.get("H_minus_in",0.0))
+        return [U_plus_in,H_plus_in,M_minus_in,H_minus_in]
     #set the standard reaction's parameters and return the parameter list
     def set_standard_params(self,U_plus_in,H_plus_in,M_minus_in,H_minus_in):
         return [U_plus_in,H_plus_in,M_minus_in,H_minus_in]

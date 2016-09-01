@@ -669,20 +669,20 @@ class Simulator(object):
         out_file.close()
         print "%s generated successful!" % out_file_path
 def get_params_from(**param_hash):
-    rd_data_name = str(param_hash.get("rd_data_name")).replace("\"", "")
+    rd_data_name = str(param_hash.get("rd_data_name","")).replace("\"", "")
     #the experimental data file_path
     alpha_val = float(param_hash.get("alpha_val",-2.0))
     pow_num = float(param_hash.get("pow_num", -1.0))
 
     #模拟的轮数
-    simulation_round_start=int(param_hash.get("simulation_round_start"))
-    simulation_round_end=int(param_hash.get("simulation_round_end"))
+    simulation_round_start=int(param_hash.get("simulation_round_start",0))
+    simulation_round_end=int(param_hash.get("simulation_round_end",0))
 
     #模拟代数
-    number_of_generations = int(param_hash.get("number_of_generations"))
+    number_of_generations = int(param_hash.get("number_of_generations",0))
 
     #每代内迭代的时间步数
-    n_time_step=int(param_hash.get("n_time_step"))
+    n_time_step=int(param_hash.get("n_time_step",0))
 
     #是否采用多线程
     multi_threads = param_hash.get("multi_threads") == str(True)
@@ -690,13 +690,13 @@ def get_params_from(**param_hash):
     max_threads=int(param_hash.get("max_threads",1))
 
     #相邻的位点数量
-    nearby_distance = int(param_hash.get("nearby_distance"))
+    nearby_distance = int(param_hash.get("nearby_distance",-1))
 
     #相邻是否是真正距离的相邻
     real_nearby=param_hash.get("real_nearby") == str(True)
 
     #最大细胞数量
-    max_cells = int(param_hash.get("max_cells"))
+    max_cells = int(param_hash.get("max_cells",0))
 
     #细节时间步长起始、结束的时间步
     detail_for_timestep_start=int(param_hash.get("detail_for_timestep_start"))
@@ -705,34 +705,34 @@ def get_params_from(**param_hash):
     #是否采用真实的染色体的位置,True则用chr1的,否则人造一条染色体
     real_chr_pos = param_hash.get("real_chr_pos") == str(True)
     #一共分多少部分
-    partial=int(param_hash.get("partial"))
-    partial_max = float(param_hash.get("partial_max"))
+    partial=int(param_hash.get("partial",0))
+    partial_max = float(param_hash.get("partial_max",0))
 
     #计算的起始和结束部分的比例index
-    partial_start=int(param_hash.get("partial_start"))
-    partial_end=int(param_hash.get("partial_end"))
+    partial_start=int(param_hash.get("partial_start",0))
+    partial_end=int(param_hash.get("partial_end",0))
 
     #实验的重复次数
-    repeat_start=int(param_hash.get("repeat_start"))
-    repeat_end=int(param_hash.get("repeat_end"))
+    repeat_start=int(param_hash.get("repeat_start",0))
+    repeat_end=int(param_hash.get("repeat_end",0))
     rd_file_pre=str(param_hash.get("rd_file_pre")).replace("\"","")
 
-    m_ratio = float(param_hash.get("m_ratio"))  # the site origin ratio
-    h_ratio = float(param_hash.get("h_ratio"))
-    u_ratio = float(param_hash.get("u_ratio"))
+    m_ratio = float(param_hash.get("m_ratio",0.0))  # the site origin ratio
+    h_ratio = float(param_hash.get("h_ratio",0.0))
+    u_ratio = float(param_hash.get("u_ratio",0.0))
 
     calc_interval = param_hash.get("calc_interval") == str(True)  # 是否包含中间的位点
 
     just_simulate=param_hash.get("just_simulate") == str(True)  # 是否包含中间的位点
 
-    sorted_ratio_dir_name = str(param_hash.get("sorted_ratio_dir_name")).replace("\"","")
-    sorted_ratio_bk_dir_name = str(param_hash.get("sorted_ratio_bk_dir_name")).replace("\"","")
-    sorted_detail_dir_name =str(param_hash.get("sorted_detail_dir_name")).replace("\"","")
-    bed_files_dir_name = str(param_hash.get("bed_files_dir_name")).replace("\"","")
-    rd_with_dir_name =str(param_hash.get("rd_with_dir_name")).replace("\"","")
-    rd_without_dir_name = str(param_hash.get("rd_without_dir_name")).replace("\"","")
+    sorted_ratio_dir_name = str(param_hash.get("sorted_ratio_dir_name","")).replace("\"","")
+    sorted_ratio_bk_dir_name = str(param_hash.get("sorted_ratio_bk_dir_name","")).replace("\"","")
+    sorted_detail_dir_name =str(param_hash.get("sorted_detail_dir_name","")).replace("\"","")
+    bed_files_dir_name = str(param_hash.get("bed_files_dir_name","")).replace("\"","")
+    rd_with_dir_name =str(param_hash.get("rd_with_dir_name","")).replace("\"","")
+    rd_without_dir_name = str(param_hash.get("rd_without_dir_name","")).replace("\"","")
 
-    calc_d_max = int(param_hash.get("calc_d_max"))  # 计算的相关性最大距离
+    calc_d_max = int(param_hash.get("calc_d_max",0))  # 计算的相关性最大距离
     ignore_d = param_hash.get("ignore_d") == str(True)  # 是否忽略位点间距离而计算相关性
 
     return rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations\
@@ -752,7 +752,7 @@ def get_gens_in_dir(sorted_ratio_dir_path,sorted_detail_dir_path,gen_range,steps
                 gens_rtn.append(str(gen)+"_"+str(step))
     return gens_rtn
 def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash):
-    rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations,n_time_step,multi_threads,num_sites_per_thread,max_threads,nearby_distance,real_nearby,max_cells,detail_for_timestep_start,detail_for_timestep_end,real_chr_pos,partial,partial_max,partial_start,partial_end,repeat_start,repeat_end,rd_file_pre,m_ratio,u_ratio,calc_interval,just_simulate,sorted_ratio_dir_name,sorted_ratio_bk_dir_name,sorted_ratio_bk_dir_name,sorted_detail_dir_name,bed_files_dir_name,rd_with_dir_name,rd_without_dir_name,calc_d_max,ignore_d=get_params_from(*param_hash)
+    rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations,n_time_step,multi_threads,num_sites_per_thread,max_threads,nearby_distance,real_nearby,max_cells,detail_for_timestep_start,detail_for_timestep_end,real_chr_pos,partial,partial_max,partial_start,partial_end,repeat_start,repeat_end,rd_file_pre,m_ratio,u_ratio,calc_interval,just_simulate,sorted_ratio_dir_name,sorted_ratio_bk_dir_name,sorted_ratio_bk_dir_name,sorted_detail_dir_name,bed_files_dir_name,rd_with_dir_name,rd_without_dir_name,calc_d_max,ignore_d=get_params_from(**param_hash)
     sim_rounds = range(simulation_round_start,simulation_round_end+1)
     detail_for_timestep = range(detail_for_timestep_start,detail_for_timestep_end+1)
 
@@ -769,7 +769,6 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
                 reaction_hash=load_param_from_file(reaction_param_file_for_0_path)
             else:
                 reaction_hash=load_param_from_file(reaction_param_file_path)
-
             propensity_list = function_util.set_collaborative_params(**reaction_hash)
 
             #若不采取真实染色体位置
