@@ -2,25 +2,19 @@
 import random,math,os,threading,datetime,re,shutil,collections,pickle
 import numpy as np
 from FunctionUtil import FunctionUtil
-
-BED_FILE_PATH="chr1.bed"
-THRESHOLD_U=0.2
-THRESHOLD_M=0.8
 N_STEP=100
-
 REACTION_STATUS_HASH={0:'H',1:'M',2:'H',3:'U',4:'M',5:'M',6:'H',7:'U',8:'H'}
 RIGHT_STATUS_OF_REACTION={0:"U",1:"H",2:"M",3:"H",4:"H",5:"H",6:"U",7:"H",8:"M"}
 STATE_OF_COLLABOR_REACTION={4:"H",5:"M",6:"M",7:"U",8:"U"}
 BASE_RATE_HASH={4:1,5:1,6:0,7:3,8:2} #collaboration reaction base reaction rate index_hash
-COLLABORATION_INDEX=4
+
 class Simulator(object):
     '''
         This is a base class for nearby , random collaborative and traditional simulation
     '''
 
     # Construction function
-    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1,2],real_nearby=False,n_time_step=N_STEP,phi_param=1.0,pij_type="d_equal",d_limit2=10,rd_data_name="",alpha_val=-1.0,pow_num=-1.0):
-        #create the output dir
+    def __init__(self,propensity_list,rounds=range(1,2),out_dir="out",max_cpg_sites=1000,generations=10,pos_list=[],multi_threads=False,num_sites_per_thread=1,max_threads=1,init_cell="",nearby=-1,max_cells=2,index="index",detail_for_timestep=[0,1,2],real_nearby=False,n_time_step=N_STEP,phi_param=1.0,rd_data_name="",alpha_val=-1.0,pow_num=-1.0):
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         self.out_dir=out_dir
@@ -39,15 +33,10 @@ class Simulator(object):
         self.real_nearby=real_nearby
         self.n_time_step=n_time_step
         self.phi_param=phi_param
-        self.pij_type=pij_type
-        self.random_site=random.randint(0,max_cpg_sites)
-        self.d_limit1=self.nearby
         self.rd_data_name=rd_data_name
-        if self.pij_type=="d_range":
-            self.d_limit2=d_limit2
         if self.multi_threads==True:
-            self.num_sites_per_thread=500
-            self.max_threads = 230
+            self.num_sites_per_thread = num_sites_per_thread
+            self.max_threads = max_threads
             self.num_of_threads = int(math.ceil(float(len(init_cell)) / self.num_sites_per_thread)) # thread counts
             self.num_turns = int(math.ceil(float(self.num_of_threads) / self.max_threads)) # when the max_thread is not enough for one round simulation, split it in to num_turns
             self.threads = [] # thread array
@@ -186,9 +175,11 @@ class Simulator(object):
                     target_reaction_CpG_site=random.randint(0,len(cell_collection[idx])-1)
 
                     if nearby>0:
+                        #如果nearby_distance参数>0则取该大小范围的任意一个位点
                         start=max(target_reaction_CpG_site-nearby,0)
                         end=min(target_reaction_CpG_site+nearby,len(cell_collection[idx])-1)
                     else:
+                        #如果nearby_distance参数<0,则随机一个位点
                         start=0
                         end=len(cell_collection[idx])-1
 
@@ -206,13 +197,13 @@ class Simulator(object):
 
                         distance = int(math.fabs(pos_target-col_site_pos))
 
+                        #如果real_nearby==True,则计算其位点的真实距离是否 < 要求的nearby_distance
                         if (real_nearby) == True and (distance > nearby):
                             continue
-                        if self.pij_type == "d_range" and distance not in range(self.d_limit1,self.d_limit2):
-                            continue
+
                         phi_d = self.phi(d=distance)
 
-                        pij=self.p_ij(col_site_pos,distance)
+                        pij = 1.0
                         propensity_tmp = self.calc_propensity_list(phi_d , PROPENCITY_LIST,pij,status_of_col_site,phi_d , phi_d)
                     else:
                         propensity_tmp=PROPENCITY_LIST
@@ -263,27 +254,11 @@ class Simulator(object):
             return 1.0
         else:
             return 0.0
-    def p_ij(self,j,d):
-        pij = 0.0
-        if self.pij_type == "d_equal":
-            if d == self.d_limit1:
-                return 1.0
-        elif self.pij_type == "d_less":
-            if d < self.d_limit1:
-                return 1.0
-        elif self.pij_type == "d_range":
-            if d in range(self.d_limit1,self.d_limit2):
-                return 1.0
-        elif self.pij_type == "random":
-            if j == self.random_site:
-                return 1.0
-        elif self.pij_type == "tradion":
-            return 0.0
-        return pij
     def set_phi(self,phi):
         self.phi_param = phi
-
     def phi(self,d=2):
+        return self.phi_param
+    def phi_calc(self,d=2):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[d]
             divder = (1.0 - rd_d)
@@ -294,68 +269,6 @@ class Simulator(object):
             return phi_val
         else:
             return 1.0
-    def phi_bk_now(self, d=2):
-        return 1.0
-    def phi_0_6(self,d = 2): #the phi function which used for control the collaborative rate
-        p1=0.5
-        a=10.3066
-        b=1.664
-        c=2.6561
-        p=0.25
-        omega=0.03
-        fi=2.6592
-        q=1.072
-        d=float(d)
-        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
-        return gd
-    def phi_0_5(self,d = 2): #the phi function which used for control the collaborative rate
-        p1=0.5
-        a=8.2061
-        b=1.664
-        c=3.3361
-        p=0.25
-        omega=0.03
-        fi=2.6592
-        q=1.072
-        d=float(d)
-        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
-        return gd
-    def phi_0_4(self,d = 2): #the phi function which used for control the collaborative rate
-        p1=0.5
-        a=6.2087
-        b=1.664
-        c=4.4093
-        p=0.25
-        omega=0.03
-        fi=2.6592
-        q=1.072
-        d=float(d)
-        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
-        return gd
-    def phi_0_8(self,d = 2): #the phi function which used for control the collaborative rate
-        p1=0.5
-        a=14.767
-        b=1.664
-        c=1.8539
-        p=0.25
-        omega=0.03
-        fi=2.6592
-        q=1.072
-        d=float(d)
-        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
-        return gd
-    def phi_bk(self,d = 2): #the phi function which used for control the collaborative rate
-        p1=0.8
-        a=1.083
-        b=0.088
-        c=1.394
-        p=0.5
-        omega=0.028
-        fi=2.784
-        q=1.017
-        d=float(d)
-        gd=a/(1.0+b*math.pow(d,p1))+(math.sin(omega*d/q+fi))/(c*math.pow(d,p))
-        return gd
     def calc_propensity_list(self,phi_d,propensity_list,pij,xj_status,phi_plus_d,phi_minus_d): # according to the ratio to scale the propensity_list collaborative rate
         U_plus=propensity_list[0]
         H_plus=propensity_list[1]
@@ -401,7 +314,6 @@ class Simulator(object):
                     cell1 = cell1 + "U"
                     cell2 = cell2 + "H"
         return [cell1, cell2]
-
     def sort_the_simulaiton_result(self,base_dir,sorted_ratio_dir,sort_detail_dir,start_round,end_round,excepts_rounds=[],is_filter=False,filter_bounds=[]):# 对多线程的模拟结果进行排序整合成按照generation的统计文件,见sorted_ratio/和sorted_detail文件夹
         if not os.path.exists(sorted_ratio_dir):
             os.makedirs(sorted_ratio_dir)
@@ -412,7 +324,6 @@ class Simulator(object):
         self.sort_detail(base_dir,sort_detail_dir,start_round,end_round,excepts_rounds)
 
         return remained_generations
-
     def set_filter_range_bounds(self,m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52):
         return [m_down,m_up,h_down,h_up,u_down,u_up]
     def sort_ratio(self,input_file_dir, output_file_dir, start_round, end_round, excepts_rounds=[], is_filter=False,filter_bounds=[]): # 对各个线程产生的ratio进行排序,生成gen_X_XX_ratio.csv
@@ -757,6 +668,79 @@ class Simulator(object):
         out_file.write(str_to_write)
         out_file.close()
         print "%s generated successful!" % out_file_path
+def get_params_from(**param_hash):
+    rd_data_name = str(param_hash.get("rd_data_name","")).replace("\"", "")
+    #the experimental data file_path
+    alpha_val = float(param_hash.get("alpha_val",-2.0))
+    pow_num = float(param_hash.get("pow_num", -1.0))
+
+    #模拟的轮数
+    simulation_round_start=int(param_hash.get("simulation_round_start",0))
+    simulation_round_end=int(param_hash.get("simulation_round_end",0))
+
+    #模拟代数
+    number_of_generations = int(param_hash.get("number_of_generations",0))
+
+    #每代内迭代的时间步数
+    n_time_step=int(param_hash.get("n_time_step",0))
+
+    #是否采用多线程
+    multi_threads = param_hash.get("multi_threads") == str(True)
+    num_sites_per_thread=int(param_hash.get("num_sites_per_thread",1))
+    max_threads=int(param_hash.get("max_threads",1))
+
+    #相邻的位点数量
+    nearby_distance = int(param_hash.get("nearby_distance",-1))
+
+    #相邻是否是真正距离的相邻
+    real_nearby=param_hash.get("real_nearby") == str(True)
+
+    #最大细胞数量
+    max_cells = int(param_hash.get("max_cells",0))
+
+    #细节时间步长起始、结束的时间步
+    detail_for_timestep_start=int(param_hash.get("detail_for_timestep_start"))
+    detail_for_timestep_end=int(param_hash.get("detail_for_timestep_end"))
+
+    #是否采用真实的染色体的位置,True则用chr1的,否则人造一条染色体
+    real_chr_pos = param_hash.get("real_chr_pos") == str(True)
+    #一共分多少部分
+    partial=int(param_hash.get("partial",0))
+    partial_max = float(param_hash.get("partial_max",0))
+
+    #计算的起始和结束部分的比例index
+    partial_start=int(param_hash.get("partial_start",0))
+    partial_end=int(param_hash.get("partial_end",0))
+
+    #实验的重复次数
+    repeat_start=int(param_hash.get("repeat_start",0))
+    repeat_end=int(param_hash.get("repeat_end",0))
+    rd_file_pre=str(param_hash.get("rd_file_pre")).replace("\"","")
+
+    m_ratio = float(param_hash.get("m_ratio",0.0))  # the site origin ratio
+    h_ratio = float(param_hash.get("h_ratio",0.0))
+    u_ratio = float(param_hash.get("u_ratio",0.0))
+
+    calc_interval = param_hash.get("calc_interval") == str(True)  # 是否包含中间的位点
+
+    just_simulate=param_hash.get("just_simulate") == str(True)  # 是否包含中间的位点
+
+    sorted_ratio_dir_name = str(param_hash.get("sorted_ratio_dir_name","")).replace("\"","")
+    sorted_ratio_bk_dir_name = str(param_hash.get("sorted_ratio_bk_dir_name","")).replace("\"","")
+    sorted_detail_dir_name =str(param_hash.get("sorted_detail_dir_name","")).replace("\"","")
+    bed_files_dir_name = str(param_hash.get("bed_files_dir_name","")).replace("\"","")
+    rd_with_dir_name =str(param_hash.get("rd_with_dir_name","")).replace("\"","")
+    rd_without_dir_name = str(param_hash.get("rd_without_dir_name","")).replace("\"","")
+
+    calc_d_max = int(param_hash.get("calc_d_max",0))  # 计算的相关性最大距离
+    ignore_d = param_hash.get("ignore_d") == str(True)  # 是否忽略位点间距离而计算相关性
+
+    return rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations\
+        ,n_time_step,multi_threads,num_sites_per_thread,max_threads,nearby_distance,real_nearby,max_cells,detail_for_timestep_start\
+        ,detail_for_timestep_end,real_chr_pos,partial,partial_max,partial_start,partial_end\
+        ,repeat_start,repeat_end,rd_file_pre,m_ratio,u_ratio,calc_interval,just_simulate\
+        ,sorted_ratio_dir_name,sorted_ratio_bk_dir_name,sorted_ratio_bk_dir_name,sorted_detail_dir_name\
+        ,bed_files_dir_name,rd_with_dir_name,rd_without_dir_name,calc_d_max,ignore_d
 def get_gens_in_dir(sorted_ratio_dir_path,sorted_detail_dir_path,gen_range,steps=range(100)):
     gens_rtn=[]
     for gen in gen_range:
@@ -768,70 +752,18 @@ def get_gens_in_dir(sorted_ratio_dir_path,sorted_detail_dir_path,gen_range,steps
                 gens_rtn.append(str(gen)+"_"+str(step))
     return gens_rtn
 def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash):
-    rd_data_name = str(param_hash.get("rd_data_name")).replace("\"", "")
-    alpha_val = float(param_hash.get("alpha_val",-2.0))
-    pow_num = float(param_hash.get("pow_num", -1.0))
-
-    simulation_round_start=int(param_hash.get("simulation_round_start"))
-    simulation_round_end=int(param_hash.get("simulation_round_end"))
-
+    rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations,n_time_step,multi_threads,num_sites_per_thread,max_threads,nearby_distance,real_nearby,max_cells,detail_for_timestep_start,detail_for_timestep_end,real_chr_pos,partial,partial_max,partial_start,partial_end,repeat_start,repeat_end,rd_file_pre,m_ratio,u_ratio,calc_interval,just_simulate,sorted_ratio_dir_name,sorted_ratio_bk_dir_name,sorted_ratio_bk_dir_name,sorted_detail_dir_name,bed_files_dir_name,rd_with_dir_name,rd_without_dir_name,calc_d_max,ignore_d=get_params_from(**param_hash)
     sim_rounds = range(simulation_round_start,simulation_round_end+1)
-
-    number_of_generations = int(param_hash.get("number_of_generations"))
-
-    multi_threads = param_hash.get("multi_threads") == str(True)
-    nearby_distance = int(param_hash.get("nearby_distance"))
-    real_nearby=param_hash.get("real_nearby") == str(True)
-
-    n_time_step=int(param_hash.get("n_time_step"))
-
-
-    max_cells = int(param_hash.get("max_cells"))
-    detail_for_timestep_start=int(param_hash.get("detail_for_timestep_start"))
-    detail_for_timestep_end=int(param_hash.get("detail_for_timestep_end"))
-
     detail_for_timestep = range(detail_for_timestep_start,detail_for_timestep_end+1)
 
-    real_chr_pos = param_hash.get("real_chr_pos") == str(True)
-
-    if not real_chr_pos:
-        geometric_p = float(param_hash.get("geometric_p"))
-        plot = param_hash.get("plot") == str(True)
-        max_cpg_sites = int(param_hash.get("max_cpg_sites"))
-
-    partial=int(param_hash.get("partial"))
-    m_ratio = float(param_hash.get("m_ratio"))  # the site origin ratio
-    h_ratio = float(param_hash.get("h_ratio"))
-    u_ratio = float(param_hash.get("u_ratio"))
-    partial_start=int(param_hash.get("partial_start"))
-    partial_end=int(param_hash.get("partial_end"))
-
-    pij_type=str(param_hash.get("pij_type")).replace("\"","")
-    d_limit2=int(param_hash.get("d_limit2",9999))
-
-    repeat_start=int(param_hash.get("repeat_start"))
-    repeat_end=int(param_hash.get("repeat_end"))
-    rd_file_pre=str(param_hash.get("rd_file_pre")).replace("\"","")
-
-    calc_interval = param_hash.get("calc_interval") == str(True)  # 是否包含中间的位点
-
-    just_simulate=param_hash.get("just_simulate") == str(True)  # 是否包含中间的位点
-
-    just_do_others=param_hash.get("just_do_others") == str(True)  # 是否包含中间的位点
-
-    sorted_ratio_dir_name = str(param_hash.get("sorted_ratio_dir_name")).replace("\"","")
-    sorted_ratio_bk_dir_name = str(param_hash.get("sorted_ratio_bk_dir_name")).replace("\"","")
-    sorted_detail_dir_name =str(param_hash.get("sorted_detail_dir_name")).replace("\"","")
-    bed_files_dir_name = str(param_hash.get("bed_files_dir_name")).replace("\"","")
-    rd_with_dir_name =str(param_hash.get("rd_with_dir_name")).replace("\"","")
-    rd_without_dir_name = str(param_hash.get("rd_without_dir_name")).replace("\"","")
-
     dirs_to_delete=[sorted_detail_dir_name,bed_files_dir_name]
+    #重复repeat次
     for rep_i in range(repeat_start,repeat_end+1):
-
+        #从partial来算其对应的phi
         for partial_i in range(partial_start,partial_end+1):
             nearby_index = str(param_hash.get("index_pre_path")).replace("\"","")+str(partial_i)
             OUTPUT_DIR = str(param_hash.get("OUTPUT_DIR_first")).replace("\"","") + os.sep+str(param_hash.get("OUTPUT_DIR_second_pre")).replace("\"","")+str(rep_i)+os.sep + nearby_index
+            phi=float(partial_i)*(partial_max/partial)
 
             if partial_i==0:
                 reaction_hash=load_param_from_file(reaction_param_file_for_0_path)
@@ -839,24 +771,33 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
                 reaction_hash=load_param_from_file(reaction_param_file_path)
             propensity_list = function_util.set_collaborative_params(**reaction_hash)
 
-            phi=float(partial_i)*(1.0/partial)
+            #若不采取真实染色体位置
             if not real_chr_pos:
+                #超几何分布参数
+                geometric_p = float(param_hash.get("geometric_p"))
+                #是否画出直方图
+                plot = param_hash.get("plot") == str(True)
+                #最大CpG位点数量
+                max_cpg_sites = int(param_hash.get("max_cpg_site_param"))
+
+                #Construct cpg position from exponet distribution and Construct a CpG status chain
                 cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
                                                                                                 plot=plot)
                 init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
             else:
+                #read cpg position from bed file and Construct a CpG status chain
                 input_bed_file_path=str(param_hash.get("input_bed_file_path")).replace("\"","")
                 max_cpg_site_param=int(param_hash.get("max_cpg_site_param"))
                 max_cpg_sites, pos_list = function_util.get_pos_list_from_bed_file(input_bed_file_path,max_cpg_site_param)
                 init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
-
+            #create simulator
             simulator = Simulator(propensity_list, rounds=sim_rounds, out_dir=OUTPUT_DIR,
                               max_cpg_sites=max_cpg_sites, generations=number_of_generations, pos_list=pos_list,
-                              multi_threads=multi_threads, init_cell=init_cell, nearby=nearby_distance, max_cells=max_cells,
-                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi,pij_type=pij_type,d_limit2=d_limit2,rd_data_name=rd_data_name,alpha_val=alpha_val,pow_num=pow_num)
-            if not just_do_others:
+                              multi_threads=multi_threads, init_cell=init_cell, nearby=nearby_distance, max_cells=max_cells,num_sites_per_thread=num_sites_per_thread,max_threads=max_threads,
+                              index=nearby_index, detail_for_timestep=detail_for_timestep,real_nearby=real_nearby,n_time_step=n_time_step,phi_param=phi,rd_data_name=rd_data_name,alpha_val=alpha_val,pow_num=pow_num)
+            if just_simulate:
                 simulator.run()
-            if not just_simulate:
+            else:
                 sorted_ratio_dir = OUTPUT_DIR + os.sep + sorted_ratio_dir_name
                 sorted_ratio_bk_dir = OUTPUT_DIR + os.sep + sorted_ratio_bk_dir_name
                 sort_detail_dir = OUTPUT_DIR + os.sep + sorted_detail_dir_name
@@ -865,10 +806,11 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
                 rd_without_dir = OUTPUT_DIR + os.sep + rd_without_dir_name
 
                 simulator.sort_the_simulaiton_result(OUTPUT_DIR,sorted_ratio_dir,sort_detail_dir, simulator.rounds[0],simulator.rounds[len(simulator.rounds)-1], [], False)
-                #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
-                filter_bounds = simulator.set_filter_range_bounds(m_down=float(param_hash.get("m_down")), m_up=float(param_hash.get("m_up")), h_down=float(param_hash.get("h_down")), h_up=float(param_hash.get("h_up")), u_down=float(param_hash.get("u_down")),
-                                                                  u_up=float(param_hash.get("u_up")))
+
+                # filter_bounds = simulator.set_filter_range_bounds(m_down=float(param_hash.get("m_down")), m_up=float(param_hash.get("m_up")), h_down=float(param_hash.get("h_down")), h_up=float(param_hash.get("h_up")), u_down=float(param_hash.get("u_down")),
+                #                                                   u_up=float(param_hash.get("u_up")))
                 str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(29,number_of_generations),range(n_time_step))
+                #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
                 # remained_generations = simulator.sort_the_simulaiton_result(OUTPUT_DIR, sorted_ratio_dir,
                 #                                                             sort_detail_dir, simulator.rounds[0],
                 #                                                             simulator.rounds[len(simulator.rounds) - 1], [], True,
@@ -882,229 +824,15 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
                         step_temp="0"+step_temp
                     replaced_gen=float(gen_temp+"."+step_temp)
                     remained_gens.append(replaced_gen)
-
                 simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_gens)
-
-                calc_d_max = int(param_hash.get("calc_d_max"))  # 计算的相关性最大距离
-                ignore_d = param_hash.get("ignore_d") == str(True)  # 是否忽略位点间距离而计算相关性
-                #list_gen = remained_generations
-                # if partial_i >= 5:
-                #     remained_gen_filter_left=float(param_hash.get("remained_gen_filter_left"))
-                #     remained_gen_filter_right=float(param_hash.get("remained_gen_filter_right"))
-                # else:
-                #     remained_gen_filter_left=20
-                #     remained_gen_filter_right=float(param_hash.get("remained_gen_filter_right"))
-                # str_list_gen = []
-                # for item in list_gen:
-                #     item = str(item).replace(".", "_")
-                #     str_list_gen.append(str(item))
-
                 simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
                                     calc_interval=calc_interval, ignore_d=ignore_d,rd_file_pre=rd_file_pre)
                 #remove_dirs(OUTPUT_DIR,dirs_start_with_list=dirs_to_delete)
-                file_start_with_list=["detail_",".DS_Store"]
+                #file_start_with_list=["detail_",".DS_Store"]
                 #remove_dirs(OUTPUT_DIR,file_start_with_list=file_start_with_list)
     #param_file_path=OUTPUT_DIR+os.sep+"param.txt"
     #collaborative = param_hash.get("collaborative") == str(True)
     #simulator.generate_param_file(param_file_path,simulator.propensity_list,collaborative=collaborative)
-def remove_dirs(root,file_start_with_list=[],dirs_start_with_list=[]):
-    for parent,dirnames,filenames in os.walk(root):    #三个参数：分别返回1.父目录 2.所有文件夹名字（不含路径） 3.所有文件名字
-        if len(dirs_start_with_list):
-            for dirname in  dirnames:
-                if len(dirs_start_with_list) and dirname in dirs_start_with_list:
-                    dir_path=os.path.join(parent,dirname)
-                    shutil.rmtree(dir_path,True)
-                    print dir_path+" removed!"
-        if len(file_start_with_list):
-            for filename in filenames:
-                file_path=os.path.join(parent,filename)
-                for start_item in file_start_with_list:
-                    if filename.startswith(start_item):
-                        os.remove(file_path)
-                        print file_path+" removed!"
-def get_rd_array(OUTPUT_DIR_first,OUTPUT_DIR_second_pre,index_pre_path,rep=range(10),partial=range(20),gen_range=range(46,50),detail_range=range(100),rd_file_pre="rd_",rd_dir_name="rd_without",rd_cared_d=2):
-    rd_array=[]
-    arr_len=partial[len(partial)-1]
-    hash_len=rep[len(rep)-1]
-    for j in range(0,arr_len+1):
-        rd_array.append([])
-        for i in range(0,hash_len+1):
-            rd_array[j].append({})
-            for k in gen_range:
-                rd_array[j][i][k]=[]
-    for i in range(0,hash_len+1):
-        first_name=OUTPUT_DIR_second_pre+str(i)
-        for j in range(0,arr_len+1):
-            print "rep %d, partial %d" %(i,j)
-            second_name=index_pre_path+str(j)
-            third_name=rd_dir_name
-            for k in gen_range:
-                for l in detail_range:
-                    end_name=rd_file_pre+str(k)+"_"+str(l)+".csv"
-                    full_path=OUTPUT_DIR_first+os.sep+first_name+os.sep+second_name+os.sep+third_name+os.sep+end_name
-                    if os.path.exists(full_path):
-                        rd_file=open(full_path,"r")
-                        line=rd_file.readline()
-                        line_arr=line.split(",")
-                        if line_arr[0]==str(rd_cared_d):
-                            rd_array[j][i][k].append(float(line_arr[1]))
-                        rd_file.close()
-    return rd_array
-def store_rd_result(**param_hash):
-    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
-    output_pickle_path=OUTPUT_DIR_first+os.sep+str(param_hash.get("pickle_path")).replace("\"","")
-    print "dump start!"
-    output_pickle = open(output_pickle_path, 'wb')
-
-    partial_start=int(param_hash.get("partial_start"))
-    partial_end=int(param_hash.get("partial_end"))
-
-    repeat_start=int(param_hash.get("repeat_start"))
-    repeat_end=int(param_hash.get("repeat_end"))
-
-    rd_gen_start=int(param_hash.get("rd_gen_start"))
-    rd_gen_end=int(param_hash.get("rd_gen_end"))
-
-    rep=range(repeat_start,repeat_end+1)
-    partial=range(partial_start,partial_end+1)
-    gen_range=range(rd_gen_start,rd_gen_end+1)
-    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
-    OUTPUT_DIR_second_pre=str(param_hash.get("OUTPUT_DIR_second_pre")).replace("\"","")
-    index_pre_path=str(param_hash.get("index_pre_path")).replace("\"","")
-    detail_for_timestep_start=int(param_hash.get("detail_for_timestep_start"))
-    detail_for_timestep_end=int(param_hash.get("detail_for_timestep_end"))
-    detail_range=range(detail_for_timestep_start,detail_for_timestep_end+1)
-    rd_file_pre=str(param_hash.get("rd_file_pre")).replace("\"","")
-    calc_interval = param_hash.get("calc_interval") == str(True)  # 是否包含中间的位点
-    if calc_interval==True:
-        rd_dir_name=str(param_hash.get("rd_with_dir_name")).replace("\"","")
-    else:
-        rd_dir_name=str(param_hash.get("rd_without_dir_name")).replace("\"","")
-    rd_cared_d=int(param_hash.get("rd_cared_d"))
-    rd_array=get_rd_array(OUTPUT_DIR_first,OUTPUT_DIR_second_pre,index_pre_path,rep=rep,partial=partial,gen_range=gen_range,detail_range=detail_range,rd_file_pre=rd_file_pre,rd_dir_name=rd_dir_name,rd_cared_d=rd_cared_d)
-
-    pickle.dump(rd_array,output_pickle,-1)
-    print "dump completed!"
-    output_pickle.close()
-def load_rd_result(**param_hash):
-    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
-    input_pickle_path=OUTPUT_DIR_first+os.sep+str(param_hash.get("pickle_path")).replace("\"","")
-    input_pickle = open(input_pickle_path, 'rb')
-
-    rd_array=pickle.load(input_pickle)
-    print "dump readed!"
-    input_pickle.close()
-    return rd_array
-def calc_mean_rd_with_phi_in_range(rd_array,rep=range(10),partial=range(20),gen_range=range(46,50),rd_min_count=10):
-    rd_mean_list=[]
-    rd_median_list=[]
-    rd_sum={}
-    rd_calc_list={}
-    rd_count={}
-    for j in partial:
-        rd_count[j]=0
-        rd_sum[j]=0.0
-        rd_calc_list[j]=[]
-        for i in rep:
-            for gen in gen_range:
-                if gen in rd_array[j][i].keys():
-                    list_base_gen=rd_array[j][i][gen]
-                    if len(list_base_gen):
-                        for val in list_base_gen:
-                            rd_count[j]=rd_count[j]+1
-                            rd_sum[j]=rd_sum[j]+val
-                            rd_calc_list[j].append(val)
-        if rd_count[j] > rd_min_count:# and median(rd_calc_list[j]) >0.0:
-            j_median=median(rd_calc_list[j])
-            rd_median_list.append(j_median)
-
-            j_mean=rd_sum[j]/float(rd_count[j])
-            rd_mean_list.append(j_mean)
-        else:
-            print "range is too small!"
-            break
-    return rd_mean_list,rd_median_list
-def calc_mean_rd_with_phi(rd_array,rep=range(10),partial=range(20),base_rd_gen=49,rd_min_count=10):
-    rd_mean_list=[]
-    rd_median_list=[]
-    rd_sum={}
-    rd_calc_list={}
-    rd_count={}
-    tmp_base_gen=base_rd_gen
-    j=partial[0]
-    while j<=partial[len(partial)-1]:
-        rd_count[j]=0
-        rd_sum[j]=0.0
-        rd_calc_list[j]=[]
-        for i in rep:
-            if tmp_base_gen in rd_array[j][i].keys():
-                list_base_gen=rd_array[j][i][tmp_base_gen]
-                if len(list_base_gen):
-                    for val in list_base_gen:
-                        rd_count[j]=rd_count[j]+1
-                        rd_sum[j]=rd_sum[j]+val
-                        rd_calc_list[j].append(val)
-        if rd_count[j] > rd_min_count and median(rd_calc_list[j]) >0.0:
-            j_median=median(rd_calc_list[j])
-            rd_median_list.append(j_median)
-
-            j_mean=rd_sum[j]/float(rd_count[j])
-            rd_mean_list.append(j_mean)
-            tmp_base_gen=base_rd_gen
-            j=j+1
-        else:
-            tmp_base_gen=tmp_base_gen-1
-            rd_count[j]=0
-            rd_sum[j]=0.0
-            rd_calc_list[j]=[]
-    return rd_mean_list,rd_median_list
-def median(lst):
-    if not lst:
-        return
-    lst=sorted(lst)
-    if len(lst)%2==1:
-        return lst[len(lst)/2]
-    else:
-        return  (lst[len(lst)/2-1]+lst[len(lst)/2])/2.0
-def get_mean_rd(**param_hash):
-    rd_array=load_rd_result(**param_hash)
-    partial_count=int(param_hash.get("partial"))
-    partial_start=int(param_hash.get("partial_start"))
-    partial_end=int(param_hash.get("partial_end"))
-
-    repeat_start=int(param_hash.get("repeat_start"))
-    repeat_end=int(param_hash.get("repeat_end"))
-
-    rd_gen_start=int(param_hash.get("rd_gen_start"))
-    rd_gen_end=int(param_hash.get("rd_gen_end"))
-
-    rep=range(repeat_start,repeat_end+1)
-    partial=range(partial_start,partial_end+1)
-    gen_range=range(rd_gen_start,rd_gen_end+1)
-    base_rd_gen=int(param_hash.get("base_rd_gen"))
-    rd_min_count=int(param_hash.get("rd_min_count"))
-    OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
-    rd_mean_list,rd_median_list=calc_mean_rd_with_phi(rd_array,rep=rep,partial=partial,base_rd_gen=base_rd_gen,rd_min_count=rd_min_count)
-    #rd_mean_list,rd_median_list=calc_mean_rd_with_phi_in_range(rd_array,rep=rep,partial=partial,gen_range=gen_range,rd_min_count=rd_min_count)
-    out_mean_file_path=OUTPUT_DIR_first+os.sep+"mean_of_29_interval.csv"
-    out_median_file_path=OUTPUT_DIR_first+os.sep+"median_of_29_interval.csv"
-    out_mean_file=open(out_mean_file_path,"w")
-    out_median_file=open(out_median_file_path,"w")
-
-    print "mean result!"
-    for index,rd_mean in enumerate(rd_mean_list):
-        ratio=(index)/float(partial_count)
-        print "%f %f" %(ratio,rd_mean)
-        wrt_str=str(round(ratio,2))+","+str(rd_mean)+"\n"
-        out_mean_file.write(wrt_str)
-    out_mean_file.close()
-    print "median result!"
-    for index,rd_median in enumerate(rd_median_list):
-        ratio=(index)/float(partial_count)
-        print "%f %f" %(ratio,rd_median)
-        wrt_str=str(round(ratio,2))+","+str(rd_median)+"\n"
-        out_median_file.write(wrt_str)
-    out_median_file.close()
 def load_param_from_file(param_file_path):
     param_file=open(param_file_path,"r")
 
@@ -1166,17 +894,10 @@ def load_rd(rd_file_path,length=0):
     return rd_hash
 if __name__ == '__main__':
     function_util = FunctionUtil()
+    param_base_path="input_new"+os.sep
+    procedure_param_file_path=param_base_path+"phi_try_param.txt"
+    reaction_param_file_path=param_base_path+"phi_try_reaction.txt"
+    reaction_param_file_for_0_path=param_base_path+"phi_try_reaction_0.txt"
+    param_hash=load_param_from_file(procedure_param_file_path)
 
-    param_base_path = "input"+os.sep
-
-    procedure_param_file_path = param_base_path+"not_by_fit_just_calc_right_param.txt"
-    reaction_param_file_path = param_base_path+"not_by_fit_just_calc_right_reaction.txt"
-    reaction_param_file_for_0_path = param_base_path+"not_by_fit_just_calc_right_reaction.txt"
-    param_hash = load_param_from_file(procedure_param_file_path)
-    start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
-
-    # rd_dir_name = "/Users/Ren/PycharmProjects/Methylation_Server/rd_not_fit_0_28_right/rd_not_fit_1/simulation_1/rd_without"
-    # out_file_path = "/Users/Ren/PycharmProjects/Methylation_Server/rd_not_fit_0_28_right/rd_not_fit_1/simulation_1/rd_right_mean_0_28.csv"
-    #store_rd_result(**param_hash)
-    #get_mean_rd(**param_hash)
-    # calc_mean_rd_from_rd_dir(rd_dir_name,out_file_path)
+    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
