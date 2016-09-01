@@ -1167,16 +1167,16 @@ def load_rd(rd_file_path,length=0):
 if __name__ == '__main__':
     function_util = FunctionUtil()
 
-    param_base_path="input"+os.sep
+    param_base_path = "input"+os.sep
 
-    procedure_param_file_path=param_base_path+"not_by_fit_just_calc_right_param.txt"
-    reaction_param_file_path=param_base_path+"not_by_fit_just_calc_right_reaction.txt"
-    reaction_param_file_for_0_path=param_base_path+"not_by_fit_just_calc_right_reaction.txt"
-    param_hash=load_param_from_file(procedure_param_file_path)
-    rd_dir_name="/Users/Ren/PycharmProjects/Methylation_Server/rd_not_fit_0_28_right/rd_not_fit_1/simulation_1/rd_without"
-    out_file_path="/Users/Ren/PycharmProjects/Methylation_Server/rd_not_fit_0_28_right/rd_not_fit_1/simulation_1/rd_right_mean_0_28.csv"
+    procedure_param_file_path = param_base_path+"not_by_fit_just_calc_right_param.txt"
+    reaction_param_file_path = param_base_path+"not_by_fit_just_calc_right_reaction.txt"
+    reaction_param_file_for_0_path = param_base_path+"not_by_fit_just_calc_right_reaction.txt"
+    param_hash = load_param_from_file(procedure_param_file_path)
+    start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
 
-    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    # rd_dir_name = "/Users/Ren/PycharmProjects/Methylation_Server/rd_not_fit_0_28_right/rd_not_fit_1/simulation_1/rd_without"
+    # out_file_path = "/Users/Ren/PycharmProjects/Methylation_Server/rd_not_fit_0_28_right/rd_not_fit_1/simulation_1/rd_right_mean_0_28.csv"
     #store_rd_result(**param_hash)
     #get_mean_rd(**param_hash)
-    calc_mean_rd_from_rd_dir(rd_dir_name,out_file_path)
+    # calc_mean_rd_from_rd_dir(rd_dir_name,out_file_path)
