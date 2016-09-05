@@ -43,8 +43,6 @@ class Simulator(object):
             print "%d thread is needed!" % self.num_of_threads
         if self.rd_data_name!="":
             self.rd_hash=load_rd("input"+os.sep+rd_data_name)
-            self.alpha_val=alpha_val
-            self.pow_num=pow_num
     def run(self):
         starttime_new=datetime.datetime.now()
         for i_round in self.rounds:
@@ -198,10 +196,11 @@ class Simulator(object):
                         distance = int(math.fabs(pos_target-col_site_pos))
 
                         #如果real_nearby==True,则计算其位点的真实距离是否 < 要求的nearby_distance
-                        if (real_nearby) == True and (distance > nearby):
+                        if real_nearby is True and (distance > nearby):
                             continue
-
-                        phi_d = self.phi(d=distance)
+                        if distance > 1000:
+                            continue
+                        phi_d = self.phi(distance=distance)
 
                         pij = 1.0 #若相邻则pij=1.0
                         propensity_tmp = self.calc_propensity_list(phi_d , PROPENCITY_LIST,pij,status_of_col_site,phi_d , phi_d)
@@ -258,17 +257,39 @@ class Simulator(object):
         self.phi_param = phi
     def phi_bk(self,d=2):
         return self.phi_param
-    def phi(self,d=2):
-        return self.phi_param
-    def phi_calc(self,d=2):
+    def phi(self,distance=2):
         if self.rd_data_name!="":
-            rd_d = self.rd_hash[d]
+            rd_d = self.rd_hash[distance]
+
+            a=0.7
+            b=0.9
+            frac_b=1.0/b
+
+            c_param=0.011826691353063037
+            d_param=0.5879548727368402
+
+            s_param=0.01724392765202635
+            n_param=0.5579410184713809
+
+            k_param=4.976918099398471
+            m_param=1.10333700782049
+            frac_m=1.0/m_param
+
             divder = (1.0 - rd_d)
             if math.fabs(divder) < math.pow(10, -5):
                 divder = divder + 0.001
-            base_nm = (rd_d * self.alpha_val) / divder
-            phi_val = math.pow(base_nm, self.pow_num)
-            return phi_val
+
+            if rd_d < 0.586:
+                phi_d_now=math.pow((rd_d*a)/divder,frac_b)
+            elif rd_d < 0.626:
+                phi_d_now=(rd_d-d_param)/c_param
+            elif rd_d < 0.7266:
+                phi_d_now=(rd_d-n_param)/s_param
+            elif rd_d > 0.7266:
+                phi_d_now=math.pow((rd_d*k_param)/divder,frac_m)
+            else:
+                phi_d_now=1.0
+            return phi_d_now
         else:
             return 1.0
     def calc_propensity_list(self,phi_d,propensity_list,pij,xj_status,phi_plus_d,phi_minus_d): # according to the ratio to scale the propensity_list collaborative rate

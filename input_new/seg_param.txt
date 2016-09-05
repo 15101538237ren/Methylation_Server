@@ -44,3 +44,4 @@ rd_cared_d=2
 base_rd_gen=49
 rd_min_count=10
 input_bed_file_path="chr1.bed"
+rd_data_name="chr1_experiment_without.csv"
