@@ -256,6 +256,8 @@ class Simulator(object):
             return 0.0
     def set_phi(self,phi):
         self.phi_param = phi
+    def phi_bk(self,d=2):
+        return self.phi_param
     def phi(self,d=2):
         return self.phi_param
     def phi_calc(self,d=2):
