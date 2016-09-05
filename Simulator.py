@@ -1010,7 +1010,8 @@ def calc_mean_rd_with_phi(rd_array,rep=range(10),partial=range(20),base_rd_gen=4
     return rd_mean_list,rd_median_list
 def get_mean_rd(**param_hash):
     rd_array=load_rd_result(**param_hash)
-    partial_count=int(param_hash.get("partial"))
+    partial_max = float(param_hash.get("partial_max",0.0))
+    partial_count=int(param_hash.get("partial",1))
     partial_start=int(param_hash.get("partial_start"))
     partial_end=int(param_hash.get("partial_end"))
 
@@ -1028,21 +1029,21 @@ def get_mean_rd(**param_hash):
     OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
     rd_mean_list,rd_median_list=calc_mean_rd_with_phi(rd_array,rep=rep,partial=partial,base_rd_gen=base_rd_gen,rd_min_count=rd_min_count)
     #rd_mean_list,rd_median_list=calc_mean_rd_with_phi_in_range(rd_array,rep=rep,partial=partial,gen_range=gen_range,rd_min_count=rd_min_count)
-    out_mean_file_path=OUTPUT_DIR_first+os.sep+"mean_of_49.csv"
-    out_median_file_path=OUTPUT_DIR_first+os.sep+"median_of_49.csv"
+    out_mean_file_path=OUTPUT_DIR_first+os.sep+"mean_of_49_interval.csv"
+    out_median_file_path=OUTPUT_DIR_first+os.sep+"median_of_49_interval.csv"
     out_mean_file=open(out_mean_file_path,"w")
     out_median_file=open(out_median_file_path,"w")
 
     print "mean result!"
     for index,rd_mean in enumerate(rd_mean_list):
-        ratio=(index)/float(partial_count)
+        ratio=(partial_start+index)*partial_max/float(partial_count)
         print "%f %f" %(ratio,rd_mean)
         wrt_str=str(round(ratio,2))+","+str(rd_mean)+"\n"
         out_mean_file.write(wrt_str)
     out_mean_file.close()
     print "median result!"
     for index,rd_median in enumerate(rd_median_list):
-        ratio=(index)/float(partial_count)
+        ratio=(partial_start+index)*partial_max/float(partial_count)
         print "%f %f" %(ratio,rd_median)
         wrt_str=str(round(ratio,2))+","+str(rd_median)+"\n"
         out_median_file.write(wrt_str)
@@ -1055,6 +1056,6 @@ if __name__ == '__main__':
     reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
 
-    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
     #store_rd_result(**param_hash)
-    get_mean_rd(**param_hash)
+    #get_mean_rd(**param_hash)
