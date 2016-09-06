@@ -260,6 +260,29 @@ class Simulator(object):
     def phi(self,distance=2):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[distance]
+            a=0.3
+            b=0.9
+            frac_b=1.0/b
+            k_param=0.3
+            m_param=0.5
+            frac_m=1.0/m_param
+
+            divder = (1.0 - rd_d)
+            if math.fabs(divder) < math.pow(10, -5):
+                divder = divder + 0.001
+
+            if rd_d < 0.75:
+                phi_d_now=math.pow((rd_d*a)/divder,frac_b)
+            elif rd_d > 0.75:
+                phi_d_now=math.pow((rd_d*k_param)/divder,frac_m)
+            else:
+                phi_d_now=0.0
+            return phi_d_now
+        else:
+            return 0.0
+    def phi_1(self,distance=2):
+        if self.rd_data_name!="":
+            rd_d = self.rd_hash[distance]
 
             a=0.7
             b=0.9
@@ -1079,10 +1102,10 @@ if __name__ == '__main__':
     reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
 
-    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
     #store_rd_result(**param_hash)
     #get_mean_rd(**param_hash)
 
-    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try1\\repeat_1\\partial_1\\rd_without"
-    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try1\\repeat_1\\partial_1\\rd_seg_mean_49.csv"
-    calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+    #rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try1\\repeat_1\\partial_1\\rd_without"
+    #out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try1\\repeat_1\\partial_1\\rd_seg_mean_49.csv"
+    #calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
