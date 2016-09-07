@@ -870,14 +870,14 @@ def load_param_from_file(param_file_path):
     param_file.close()
     return param_hash
 def calc_mean_rd_from_rd_dir(rd_dir,out_file_path):
-    gen=29
+    gen=49
     rd_hash={}
     rd_min_d=2
     rd_max_d=1000
     for d in range(rd_min_d,rd_max_d):
         rd_hash[d]=[]
     for step in range(100):
-        path=rd_dir+os.sep+"chr1_r_d_with_"+str(gen)+"_"+str(step)+".csv"
+        path=rd_dir+os.sep+"chr1_rd_without_"+str(gen)+"_"+str(step)+".csv"
         if os.path.exists(path):
             rd_file=open(path,"r")
             line = rd_file.readline()
@@ -1074,11 +1074,15 @@ def get_mean_rd(**param_hash):
 if __name__ == '__main__':
     function_util = FunctionUtil()
     param_base_path = "input_new" + os.sep
-    procedure_param_file_path = param_base_path+"phi_try_param.txt"
+    procedure_param_file_path = param_base_path+"seg_param.txt"
     reaction_param_file_path = param_base_path+"phi_try_reaction.txt"
     reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
 
-    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
     #store_rd_result(**param_hash)
     #get_mean_rd(**param_hash)
+
+    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try1\\repeat_1\\partial_1\\rd_without"
+    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try1\\repeat_1\\partial_1\\rd_seg_mean_49.csv"
+    calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
