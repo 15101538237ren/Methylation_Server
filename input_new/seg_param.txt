@@ -1,7 +1,7 @@
 real_chr_pos=True
 max_cpg_site_param=100000
 number_of_generations=50
-OUTPUT_DIR_first="seg_func_try1"
+OUTPUT_DIR_first="seg_func_try2"
 just_simulate=False
 nearby_distance=1
 real_nearby=False
