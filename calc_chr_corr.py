@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
-import collections,math,re
+import random,math,os,threading,datetime,re,shutil,collections,pickle
+import numpy as np
 def read_bed_file_and_store_pos_to_a_struct(bedfile_path, ignore_d=False):
         struct_to_store = {}
         bed_file = open(bedfile_path, 'r')
@@ -68,7 +69,7 @@ def calc_C_d_by_pearson_correlation(CpG_pairs): # 根据第二种方法计算相
             return -1
         r_d = sum_up / sum_down
         return r_d
-def calc_correlation(bed_file_path, out_R_d_file_path, d_max, is_inter_with_other_cpg, ignore_d=False):
+def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_with_other_cpg, ignore_d=False):
         CpG_pos_and_methy_struct = read_bed_file_and_store_pos_to_a_struct(bed_file_path, ignore_d)
         # 要计算的d的范围
         d_list = range(2, d_max)
@@ -85,7 +86,7 @@ def calc_correlation(bed_file_path, out_R_d_file_path, d_max, is_inter_with_othe
                 CpG_pairs = filter_d_length_to_generate_CpG_pairs_not_inter_with_other_cpg(d, length_of_od,
                                                                                            od_keys, od_vals)
             d_count = len(CpG_pairs)
-            print "finish chr%s d=%d run , d_count=%d" % ("1", d, d_count)
+            print "finish chr%s d=%d run , d_count=%d" % (str(chr_no), d, d_count)
             if len(CpG_pairs) == 0:
                 print "passed d=%d" % d
                 continue
@@ -93,12 +94,27 @@ def calc_correlation(bed_file_path, out_R_d_file_path, d_max, is_inter_with_othe
             if r_d != -1:
                 line2 = str(d) + "," + str(r_d) + "\n"
                 out_R_d_file.write(line2)
-                print "finish chr%s d=%d run , r_d=%f" % ("1", d, r_d)
+                print "finish chr%s d=%d run , r_d=%f" % (str(chr_no), d, r_d)
         out_R_d_file.close()
 if __name__ == '__main__':
-    bed_file="chr2.bed"
-    our_rd_path="chr2_experiment_without.csv"
-    d_max=1000
-    is_inter_with_other_cpg=False
-    ignore_d=False
-    calc_correlation(bed_file,our_rd_path,d_max,is_inter_with_other_cpg,ignore_d)
+    input_dir = "human_splitted_bed"
+    chr_no_list = range(1, 2)
+    d_max = 1000
+    is_inter_with_other_cpg = False
+    ignore_d = False
+    standard=True
+    standard_file_end=["_plus","_minus"]
+    out_corr_dir="human"+os.sep+"corr"
+    # 如果文件夹不存在则应先创建
+    if not os.path.exists(out_corr_dir):
+        os.makedirs(out_corr_dir)
+    for chr_i in chr_no_list:
+        if standard:
+            for file_end in standard_file_end:
+                bed_file=input_dir+os.sep+"chr"+str(chr_i)+file_end+".bed"
+                our_rd_path=out_corr_dir+os.sep+"chr"+str(chr_i)+file_end+"_without.csv"
+                calc_correlation(chr_i,bed_file,our_rd_path,d_max,is_inter_with_other_cpg,ignore_d)
+        else:
+            bed_file = input_dir + os.sep + "chr" + str(chr_i) + ".bed"
+            our_rd_path = out_corr_dir + str(chr_i) + "_experiment_without.csv"
+            calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg, ignore_d)
