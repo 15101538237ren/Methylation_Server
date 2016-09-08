@@ -43,6 +43,7 @@ class Simulator(object):
             print "%d thread is needed!" % self.num_of_threads
         if self.rd_data_name!="":
             self.rd_hash=load_rd("input"+os.sep+rd_data_name)
+            self.phid_hash=load_rd("input"+os.sep+"phid_antisolved.csv")
     def run(self):
         starttime_new=datetime.datetime.now()
         for i_round in self.rounds:
@@ -257,7 +258,7 @@ class Simulator(object):
         self.phi_param = phi
     def phi_bk(self,d=2):
         return self.phi_param
-    def phi(self,distance=2):
+    def phi_final(self,distance=2):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[distance]
             a=0.4
@@ -278,6 +279,11 @@ class Simulator(object):
             else:
                 phi_d_now=0.0
             return phi_d_now
+        else:
+            return 0.0
+    def phi(self,distance=2):
+        if self.rd_data_name!="":
+            return self.phid_hash[distance]
         else:
             return 0.0
     def phi_1(self,distance=2):
@@ -1102,10 +1108,10 @@ if __name__ == '__main__':
     reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
 
-    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
     #store_rd_result(**param_hash)
     #get_mean_rd(**param_hash)
 
-    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_without"
-    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_seg40_mean_49.csv"
-    calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+    #rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_without"
+    #out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_seg40_mean_49.csv"
+    #calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
