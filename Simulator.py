@@ -1102,10 +1102,10 @@ if __name__ == '__main__':
     reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
 
-    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
     #store_rd_result(**param_hash)
     #get_mean_rd(**param_hash)
 
-    #rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try2\\repeat_1\\partial_1\\rd_without"
-    #out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_try2\\repeat_1\\partial_1\\rd_seg2_mean_49.csv"
-    #calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_without"
+    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_seg40_mean_49.csv"
+    calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
