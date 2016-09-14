@@ -69,10 +69,34 @@ def calc_C_d_by_pearson_correlation(CpG_pairs): # 根据第二种方法计算相
             return -1
         r_d = sum_up / sum_down
         return r_d
-def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_with_other_cpg, ignore_d=False):
+#根据第一种方法计算C(d)的值
+def calc_C_d_by_prob_N1_N2(CpG_pairs,threshold_to_distinct_=0.5):
+    N1=N2=N3=N4=0
+    for pair in CpG_pairs:
+        first=0
+        second=0
+        if pair[0]>=0.5:
+            first=1
+        if pair[1]>=0.5:
+            second=1
+        #N1情况
+        if first==0 and second==0:
+            N1=N1+1.0
+        elif first==0 and second==1:
+            N2=N2+1.0
+        elif first==1 and second==0:
+            N3=N3+1.0
+        elif first==1 and second==1:
+            N4=N4+1.0
+    if (N1+N2)==0 or (N3+N4)==0:
+        return -1
+    C_d=(N1/(N1+N2)+N4/(N3+N4))-1.0
+
+    return C_d
+def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_with_other_cpg,rd=1, ignore_d=False):
         CpG_pos_and_methy_struct = read_bed_file_and_store_pos_to_a_struct(bed_file_path, ignore_d)
         # 要计算的d的范围
-        d_list = range(2, d_max)
+        d_list = range(1, d_max)
         out_R_d_file = open(out_R_d_file_path, 'w')
         sorted_struct = collections.OrderedDict(sorted(CpG_pos_and_methy_struct.items()))
         od_keys = sorted_struct.keys()
@@ -90,7 +114,10 @@ def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_wi
             if len(CpG_pairs) == 0:
                 print "passed d=%d" % d
                 continue
-            r_d = calc_C_d_by_pearson_correlation(CpG_pairs)
+            if rd:
+                r_d = calc_C_d_by_pearson_correlation(CpG_pairs)
+            else:
+                r_d = calc_C_d_by_prob_N1_N2(CpG_pairs)
             if r_d != -1:
                 line2 = str(d) + "," + str(r_d) + "\n"
                 out_R_d_file.write(line2)
@@ -100,11 +127,11 @@ if __name__ == '__main__':
     input_dir = "human_splitted_bed"
     chr_no_list = range(1, 2)
     d_max = 1000
-    is_inter_with_other_cpg = False
-    ignore_d = False
-    standard=True
+    is_inter_with_other_cpg = True
+    ignore_d = True
+    standard=False
     standard_file_end=["_plus","_minus"]
-    out_corr_dir="human"+os.sep+"corr"
+    out_corr_dir="mouse"+os.sep+"corr"
     # 如果文件夹不存在则应先创建
     if not os.path.exists(out_corr_dir):
         os.makedirs(out_corr_dir)
@@ -115,6 +142,6 @@ if __name__ == '__main__':
                 our_rd_path=out_corr_dir+os.sep+"chr"+str(chr_i)+file_end+"_without.csv"
                 calc_correlation(chr_i,bed_file,our_rd_path,d_max,is_inter_with_other_cpg,ignore_d)
         else:
-            bed_file = input_dir + os.sep + "chr" + str(chr_i) + ".bed"
-            our_rd_path = out_corr_dir + str(chr_i) + "_experiment_without.csv"
-            calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg, ignore_d)
+            bed_file = "chr1.bed"#input_dir + os.sep + "chr" + str(chr_i) + ".bed"
+            our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without_cd_intuitive.csv"
+            calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,rd=1, ignore_d=ignore_d)
