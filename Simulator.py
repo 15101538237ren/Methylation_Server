@@ -43,6 +43,7 @@ class Simulator(object):
             print "%d thread is needed!" % self.num_of_threads
         if self.rd_data_name!="":
             self.rd_hash=load_rd("input"+os.sep+rd_data_name)
+            self.phid_hash=load_rd("input"+os.sep+"phid_antisolved.csv")
     def run(self):
         starttime_new=datetime.datetime.now()
         for i_round in self.rounds:
@@ -198,7 +199,7 @@ class Simulator(object):
                         #如果real_nearby==True,则计算其位点的真实距离是否 < 要求的nearby_distance
                         if real_nearby is True and (distance > nearby):
                             continue
-                        if distance > 1000:
+                        if distance > 998:
                             continue
                         phi_d = self.phi(distance=distance)
 
@@ -257,7 +258,7 @@ class Simulator(object):
         self.phi_param = phi
     def phi_bk(self,d=2):
         return self.phi_param
-    def phi(self,distance=2):
+    def phi_final(self,distance=2):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[distance]
             a=0.4
@@ -278,6 +279,23 @@ class Simulator(object):
             else:
                 phi_d_now=0.0
             return phi_d_now
+        else:
+            return 0.0
+    def phi(self,distance=2):
+        if self.rd_data_name!="":
+            rd_d = self.rd_hash[distance]
+            a=0.94
+            b=0.25
+            divder = (a - rd_d)
+            if math.fabs(divder) < math.pow(10, -5):
+                divder = divder + 0.001
+            phi_d_now=rd_d*b/divder
+            return phi_d_now
+        else:
+            return 0.0
+    def phi_fit(self,distance=2):
+        if self.rd_data_name!="":
+            return self.phid_hash[distance]
         else:
             return 0.0
     def phi_1(self,distance=2):
@@ -1106,6 +1124,6 @@ if __name__ == '__main__':
     #store_rd_result(**param_hash)
     #get_mean_rd(**param_hash)
 
-    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_without"
-    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\seg_func_jingtiao_a40\\repeat_1\\partial_1\\rd_seg40_mean_49.csv"
+    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_without"
+    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_final2_mean_49.csv"
     calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
