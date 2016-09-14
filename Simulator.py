@@ -285,7 +285,7 @@ class Simulator(object):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[distance]
             a=0.94
-            b=0.25
+            b=0.3
             divder = (a - rd_d)
             if math.fabs(divder) < math.pow(10, -5):
                 divder = divder + 0.001
@@ -817,7 +817,7 @@ def get_gens_in_dir(sorted_ratio_dir_path,sorted_detail_dir_path,gen_range,steps
                 print "gen:%d step:%d exist" % (gen,step)
                 gens_rtn.append(str(gen)+"_"+str(step))
     return gens_rtn
-def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash):
+def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,ncpg,now_distance,**param_hash):
     rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations,n_time_step,multi_threads,num_sites_per_thread,max_threads,nearby_distance,real_nearby,max_cells,detail_for_timestep_start,detail_for_timestep_end,real_chr_pos,partial,partial_max,partial_start,partial_end,repeat_start,repeat_end,rd_file_pre,m_ratio,u_ratio,calc_interval,just_simulate,sorted_ratio_dir_name,sorted_ratio_bk_dir_name,sorted_ratio_bk_dir_name,sorted_detail_dir_name,bed_files_dir_name,rd_with_dir_name,rd_without_dir_name,calc_d_max,ignore_d=get_params_from(**param_hash)
     sim_rounds = range(simulation_round_start,simulation_round_end+1)
     detail_for_timestep = range(detail_for_timestep_start,detail_for_timestep_end+1)
@@ -839,16 +839,18 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
 
             #若不采取真实染色体位置
             if not real_chr_pos:
-                #超几何分布参数
-                geometric_p = float(param_hash.get("geometric_p"))
-                #是否画出直方图
-                plot = param_hash.get("plot") == str(True)
-                #最大CpG位点数量
-                max_cpg_sites = int(param_hash.get("max_cpg_site_param"))
-
-                #Construct cpg position from exponet distribution and Construct a CpG status chain
-                cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
-                                                                                                plot=plot)
+                max_cpg_sites=ncpg
+                cpg_max_pos, pos_list = function_util.get_nsite_for_d_distance(ncpg,now_distance)
+                # #超几何分布参数
+                # geometric_p = float(param_hash.get("geometric_p"))
+                # #是否画出直方图
+                # plot = param_hash.get("plot") == str(True)
+                # #最大CpG位点数量
+                # max_cpg_sites = int(param_hash.get("max_cpg_site_param"))
+                #
+                # #Construct cpg position from exponet distribution and Construct a CpG status chain
+                # cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
+                #                                                                                 plot=plot)
                 init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
             else:
                 #read cpg position from bed file and Construct a CpG status chain
@@ -875,7 +877,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
 
                 # filter_bounds = simulator.set_filter_range_bounds(m_down=float(param_hash.get("m_down")), m_up=float(param_hash.get("m_up")), h_down=float(param_hash.get("h_down")), h_up=float(param_hash.get("h_up")), u_down=float(param_hash.get("u_down")),
                 #                                                   u_up=float(param_hash.get("u_up")))
-                str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(29,number_of_generations),range(n_time_step))
+                str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(49,number_of_generations),range(n_time_step))
                 #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
                 # remained_generations = simulator.sort_the_simulaiton_result(OUTPUT_DIR, sorted_ratio_dir,
                 #                                                             sort_detail_dir, simulator.rounds[0],
@@ -1115,15 +1117,17 @@ def get_mean_rd(**param_hash):
 if __name__ == '__main__':
     function_util = FunctionUtil()
     param_base_path = "input_new" + os.sep
-    procedure_param_file_path = param_base_path+"seg_param.txt"
+    procedure_param_file_path = param_base_path+"ncpg_param.txt"
     reaction_param_file_path = param_base_path+"phi_try_reaction.txt"
     reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
+    ncpgs=range(2,3)
+    now_distance=2
+    for ncpg in ncpgs:
+        start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,ncpg,now_distance,**param_hash)
+        #store_rd_result(**param_hash)
+        #get_mean_rd(**param_hash)
 
-    #start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
-    #store_rd_result(**param_hash)
-    #get_mean_rd(**param_hash)
-
-    rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_without"
-    out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_final2_mean_49.csv"
-    calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+        rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_without"
+        out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_final2_mean_49.csv"
+        calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
