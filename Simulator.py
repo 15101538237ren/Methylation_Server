@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-import random,math,os,threading,datetime,re,shutil,collections,pickle
+import random,math,os,threading,datetime,re,shutil,collections,pickle,json
 import numpy as np
 from FunctionUtil import FunctionUtil
 N_STEP=100
@@ -7,7 +7,7 @@ REACTION_STATUS_HASH={0:'H',1:'M',2:'H',3:'U',4:'M',5:'M',6:'H',7:'U',8:'H'}
 RIGHT_STATUS_OF_REACTION={0:"U",1:"H",2:"M",3:"H",4:"H",5:"H",6:"U",7:"H",8:"M"}
 STATE_OF_COLLABOR_REACTION={4:"H",5:"M",6:"M",7:"U",8:"U"}
 BASE_RATE_HASH={4:1,5:1,6:0,7:3,8:2} #collaboration reaction base reaction rate index_hash
-SORT_GEN = 49.0
+SORT_GEN = 2.0
 class Simulator(object):
     '''
         This is a base class for nearby , random collaborative and traditional simulation
@@ -284,7 +284,7 @@ class Simulator(object):
     def phi(self,distance=2):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[distance]
-            a=0.94
+            a=0.97
             b=0.3
             divder = (a - rd_d)
             if math.fabs(divder) < math.pow(10, -5):
@@ -387,7 +387,7 @@ class Simulator(object):
 
         self.sort_detail(base_dir,sort_detail_dir,start_round,end_round,excepts_rounds)
 
-        return remained_generations
+        return 0#remained_generations
     def set_filter_range_bounds(self,m_down=0.10,m_up=0.24,h_down=0.30,h_up=0.52,u_down=0.30,u_up=0.52):
         return [m_down,m_up,h_down,h_up,u_down,u_up]
     def sort_ratio(self,input_file_dir, output_file_dir, start_round, end_round, excepts_rounds=[], is_filter=False,filter_bounds=[]): # 对各个线程产生的ratio进行排序,生成gen_X_XX_ratio.csv
@@ -446,8 +446,12 @@ class Simulator(object):
                         len_item_of_seq_list = len(seq_list[0][1])
                         thread_num = len(seq_list)
                         for m_h_u_i in range(len_item_of_seq_list):
+                            m_h_u_i_sum=0.0
                             for thread_no in range(thread_num):
-                                out_file.write(str(seq_list[thread_no][1][m_h_u_i]) + ",")
+                                m_h_u_i_sum=m_h_u_i_sum+seq_list[thread_no][1][m_h_u_i]
+                            m_h_u_i_mean=float(m_h_u_i_sum)/float(thread_num)
+                            # out_file.write(str(seq_list[thread_no][1][m_h_u_i]) + ",")
+                            out_file.write(str(m_h_u_i_mean)+",")
                         out_file.write("\n")
                     # 1.end
 
@@ -495,14 +499,14 @@ class Simulator(object):
             line = infile.readline()
             while line:
                 match = re.search(pattern, line)
-                thread_no = int(match.group(1))
-                generation_step = float(match.group(2))
-                seq = match.group(4)
+                if match:
+                    thread_no = int(match.group(1))
+                    generation_step = float(match.group(2))
+                    seq = match.group(4)
 
-                if generation_step not in hash_of_i.keys():
-                    hash_of_i[generation_step] = {}
-                hash_of_i[generation_step][thread_no] = seq
-
+                    if generation_step not in hash_of_i.keys():
+                        hash_of_i[generation_step] = {}
+                    hash_of_i[generation_step][thread_no] = seq
                 line = infile.readline()
                 if not line:
                     break
@@ -813,11 +817,60 @@ def get_gens_in_dir(sorted_ratio_dir_path,sorted_detail_dir_path,gen_range,steps
         for step in steps:
             path=sorted_ratio_dir_path+os.sep+"gen_"+str(gen)+"_"+str(step)+"_ratio.csv"
             detail_path=sorted_detail_dir_path+os.sep+"gen_"+str(gen)+"_"+str(step)+"_detail.csv"
-            if os.path.exists(path) and os.path.exists(detail_path):
+            if os.path.exists(detail_path):
                 print "gen:%d step:%d exist" % (gen,step)
                 gens_rtn.append(str(gen)+"_"+str(step))
     return gens_rtn
-def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,ncpg,now_distance,**param_hash):
+def extract_m_percent_from(max_cpg_sites,now_distance,out_m_percent_dir,sort_detail_dir,gens):
+    percent_file = open(out_m_percent_dir + os.sep + "ncpg_"+str(max_cpg_sites)+"_d_"+str(now_distance)+".csv", "w")
+
+    for gen_i in gens:
+            print "now extract %f gen m_percent!" % gen_i
+            gen=int(math.floor(gen_i))
+            step=int(round((gen_i-float(gen))*100.0))
+            if step < 10:
+                gen_step_str = str(gen)+"_0"+str(step)
+            else:
+                gen_step_str = str(gen)+"_"+str(step)
+            detail_path=sort_detail_dir + os.sep + "gen_" + gen_step_str + "_detail.csv"
+            if not os.path.exists(detail_path):
+                continue
+            detail_file = open(detail_path, "r")
+            detail_line = detail_file.readline()
+            index = 0
+            methy_status = []
+            len_of_seq=-1
+            while detail_line:
+                index = index + 1
+                line_arr = detail_line.split(",")
+                seq = line_arr[1]
+                len_of_seq=len(seq)-1
+                for no, ch in enumerate(seq):
+                    if ch == "M":
+                        if index == 1:
+                            methy_status.append(2)
+                        else:
+                            methy_status[no] = methy_status[no] + 2
+                    elif ch == "H":
+                        if index == 1:
+                            methy_status.append(1)
+                        else:
+                            methy_status[no] = methy_status[no] + 1
+                    elif ch == "U":
+                        if index == 1:
+                            methy_status.append(0)
+                detail_line = detail_file.readline()
+                if not detail_line:
+                    break
+            print "index is %d" % index
+            methy_status_arr = np.array(methy_status)
+            m_percent = methy_status_arr.sum(axis=0) / (float(index) *len_of_seq * 2)
+            l_to_wrt=gen_step_str+","+str(m_percent)+"\n"
+            percent_file.write(l_to_wrt)
+            detail_file.close()
+            print "finished extract %f gen m_percent!" % gen_i
+    percent_file.close()
+def start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,now_distance,**param_hash):
     rd_data_name,alpha_val,pow_num,simulation_round_start,simulation_round_end,number_of_generations,n_time_step,multi_threads,num_sites_per_thread,max_threads,nearby_distance,real_nearby,max_cells,detail_for_timestep_start,detail_for_timestep_end,real_chr_pos,partial,partial_max,partial_start,partial_end,repeat_start,repeat_end,rd_file_pre,m_ratio,u_ratio,calc_interval,just_simulate,sorted_ratio_dir_name,sorted_ratio_bk_dir_name,sorted_ratio_bk_dir_name,sorted_detail_dir_name,bed_files_dir_name,rd_with_dir_name,rd_without_dir_name,calc_d_max,ignore_d=get_params_from(**param_hash)
     sim_rounds = range(simulation_round_start,simulation_round_end+1)
     detail_for_timestep = range(detail_for_timestep_start,detail_for_timestep_end+1)
@@ -828,7 +881,8 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
         #从partial来算其对应的phi
         for partial_i in range(partial_start,partial_end+1):
             nearby_index = str(param_hash.get("index_pre_path")).replace("\"","")+str(partial_i)
-            OUTPUT_DIR = str(param_hash.get("OUTPUT_DIR_first")).replace("\"","") + os.sep+str(param_hash.get("OUTPUT_DIR_second_pre")).replace("\"","")+str(rep_i)+os.sep + nearby_index
+            OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
+            OUTPUT_DIR = OUTPUT_DIR_first+ os.sep+str(param_hash.get("OUTPUT_DIR_second_pre")).replace("\"","")+str(rep_i)+os.sep + nearby_index
             phi_param=float(partial_i)*(partial_max/partial)
 
             if partial_i==0:
@@ -839,18 +893,18 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
 
             #若不采取真实染色体位置
             if not real_chr_pos:
-                max_cpg_sites=ncpg
-                cpg_max_pos, pos_list = function_util.get_nsite_for_d_distance(ncpg,now_distance)
+                #最大CpG位点数量
+                max_cpg_sites = int(param_hash.get("max_cpg_site_param"))
+                # cpg_max_pos, pos_list = function_util.get_nsite_for_d_distance(max_cpg_sites,now_distance)
                 # #超几何分布参数
-                # geometric_p = float(param_hash.get("geometric_p"))
-                # #是否画出直方图
-                # plot = param_hash.get("plot") == str(True)
-                # #最大CpG位点数量
-                # max_cpg_sites = int(param_hash.get("max_cpg_site_param"))
+                geometric_p = float(param_hash.get("geometric_p"))
+                #是否画出直方图
+                plot = param_hash.get("plot") == str(True)
+
                 #
                 # #Construct cpg position from exponet distribution and Construct a CpG status chain
-                # cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
-                #                                                                                 plot=plot)
+                cpg_max_pos, pos_list = function_util.construct_n_cpg_sites_for_exp_distribution(max_cpg_sites, geometric_p,
+                                                                                                plot=plot)
                 init_cell = function_util.generate_CpG_in_methylation_percent_UHM(max_cpg_sites, m_ratio,u_ratio)  # generate a cpg chain which have the methylation status
             else:
                 #read cpg position from bed file and Construct a CpG status chain
@@ -877,7 +931,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
 
                 # filter_bounds = simulator.set_filter_range_bounds(m_down=float(param_hash.get("m_down")), m_up=float(param_hash.get("m_up")), h_down=float(param_hash.get("h_down")), h_up=float(param_hash.get("h_up")), u_down=float(param_hash.get("u_down")),
                 #                                                   u_up=float(param_hash.get("u_up")))
-                str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(49,number_of_generations),range(n_time_step))
+                str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(3,number_of_generations),range(n_time_step))
                 #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
                 # remained_generations = simulator.sort_the_simulaiton_result(OUTPUT_DIR, sorted_ratio_dir,
                 #                                                             sort_detail_dir, simulator.rounds[0],
@@ -892,15 +946,19 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
                         step_temp="0"+step_temp
                     replaced_gen=float(gen_temp+"."+step_temp)
                     remained_gens.append(replaced_gen)
-                simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_gens)
-                simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
-                                    calc_interval=calc_interval, ignore_d=ignore_d,rd_file_pre=rd_file_pre)
+                # out_m_percent_dir= OUTPUT_DIR_first
+                # extract_m_percent_from(max_cpg_sites,now_distance,out_m_percent_dir,sort_detail_dir,remained_gens)
+
+                # simulator.sort_to_bed(simulator.pos_list,sort_detail_dir,bed_files_dir,gens=remained_gens)
+                # simulator.calc_corr(bed_files_dir, rd_with_dir, rd_without_dir, str_list_gen, calc_d_max,
+                #                     calc_interval=calc_interval, ignore_d=ignore_d,rd_file_pre=rd_file_pre)
+
                 #remove_dirs(OUTPUT_DIR,dirs_start_with_list=dirs_to_delete)
                 #file_start_with_list=["detail_",".DS_Store"]
                 #remove_dirs(OUTPUT_DIR,file_start_with_list=file_start_with_list)
-    #param_file_path=OUTPUT_DIR+os.sep+"param.txt"
-    #collaborative = param_hash.get("collaborative") == str(True)
-    #simulator.generate_param_file(param_file_path,simulator.propensity_list,collaborative=collaborative)
+    param_file_path=OUTPUT_DIR+os.sep+"param.txt"
+    collaborative = param_hash.get("collaborative") == str(True)
+    simulator.generate_param_file(param_file_path,simulator.propensity_list,collaborative=collaborative)
 def load_param_from_file(param_file_path):
     param_file=open(param_file_path,"r")
 
@@ -935,9 +993,10 @@ def calc_mean_rd_from_rd_dir(rd_dir,out_file_path):
     for d in range(rd_min_d,rd_max_d):
         rd_arr=rd_hash[d]
         sum_rd_arr=sum(rd_arr)
-        mean_rd=sum_rd_arr/float(len(rd_arr))
-        line_to_wrt=str(d)+","+str(mean_rd)+"\n"
-        out_file.write(line_to_wrt)
+        if len(rd_arr):
+            mean_rd=sum_rd_arr/float(len(rd_arr))
+            line_to_wrt=str(d)+","+str(mean_rd)+"\n"
+            out_file.write(line_to_wrt)
     out_file.close()
     print "writing mean rd finished!"
 def load_rd(rd_file_path,length=0):
@@ -1114,20 +1173,77 @@ def get_mean_rd(**param_hash):
         wrt_str=str(round(ratio,2))+","+str(rd_median)+"\n"
         out_median_file.write(wrt_str)
     out_median_file.close()
+def load_ncpg_d_from(nrange=range(1,10,2),drange=range(1,10,2),dirpath=""):
+    nd_hash={}
+    pattern= r'(\d+_\d+),([\d]+\.[\d]*)'
+    for n in nrange:
+        for d in drange:
+            file_pre=str(n)+"_d_"+str(d)
+            input_file_path=dirpath+os.sep+"d"+str(d)+os.sep+"n_"+file_pre+os.sep+"ncpg_"+file_pre+".csv"
+            input_file=open(input_file_path)
+            line=input_file.readline()
+            while line:
+                match = re.search(pattern, line)
+                if match:
+                    gen_step = match.group(1)
+                    m_percent= float(match.group(2))
+                    if gen_step not in nd_hash.keys():
+                        nd_hash[gen_step]={}
+                    if n not in nd_hash[gen_step].keys():
+                        nd_hash[gen_step][n]={}
+                    nd_hash[gen_step][n][d]=m_percent
+                line=input_file.readline()
+            input_file.close()
+    out_dir=dirpath+os.sep+"gens"
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    gen_sum={}
+
+    for gen_step in nd_hash.keys():
+        out_file_path=out_dir+os.sep+gen_step+".csv"
+        out_file=open(out_file_path,"w")
+        for n in nrange:
+            if n not in gen_sum.keys():
+                gen_sum[n]={}
+            line_arr=[]
+            for d in drange:
+                hash_val_now=nd_hash[gen_step][n][d]
+                if d not in gen_sum[n].keys():
+                    gen_sum[n][d]=hash_val_now
+                else:
+                    gen_sum[n][d]=gen_sum[n][d]+hash_val_now
+                line_arr.append(str(hash_val_now))
+            line_2_wrt=",".join(line_arr)
+            out_file.write(line_2_wrt+"\n")
+        out_file.close()
+    gen_mean={}
+    len_hash=float(len(nd_hash.keys()))
+
+    out_file_path=dirpath+os.sep+"mean_of_gens"+".csv"
+    out_file=open(out_file_path,"w")
+    for n in nrange:
+        gen_mean[n]={}
+        line_arr=[]
+        for d in drange:
+            gen_mean[n][d]=gen_sum[n][d]/len_hash
+            line_arr.append(str(gen_mean[n][d]))
+        line_2_wrt=",".join(line_arr)
+        out_file.write(line_2_wrt+"\n")
+    out_file.close()
 if __name__ == '__main__':
     function_util = FunctionUtil()
     param_base_path = "input_new" + os.sep
-    procedure_param_file_path = param_base_path+"ncpg_param.txt"
-    reaction_param_file_path = param_base_path+"phi_try_reaction.txt"
-    reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
+    procedure_param_file_path = param_base_path+"reaction_try_param.txt"
+    reaction_param_file_path = param_base_path+"reaction_try_reaction.txt"
+    reaction_param_file_for_0_path = param_base_path+"reaction_try_reaction.txt"
     param_hash = load_param_from_file(procedure_param_file_path)
-    ncpgs=range(2,3)
-    now_distance=2
-    for ncpg in ncpgs:
-        start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,ncpg,now_distance,**param_hash)
-        #store_rd_result(**param_hash)
-        #get_mean_rd(**param_hash)
 
-        rd_dir_name="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_without"
-        out_file_path="C:\\Users\\ren\\Desktop\\Methylation_Server\\final_fit2\\repeat_1\\partial_1\\rd_final2_mean_49.csv"
-        calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,2,**param_hash)
+    #store_rd_result(**param_hash)
+    #get_mean_rd(**param_hash)
+
+    # dir_name="formula_fit_plus013"
+    # base="/Users/Ren/PycharmProjects/Methylation_Server/"+dir_name+"/repeat_1/partial_1/"
+    # rd_dir_name=base+"rd_without"
+    # out_file_path=base+dir_name+"_mean_49.csv"
+    # calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)

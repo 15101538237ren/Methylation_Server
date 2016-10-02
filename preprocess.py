@@ -75,7 +75,7 @@ def batch_bed_to_methy(input_file_path,chr_no_list,out_dir,standard=False):
         out_put_file_path=out_dir+os.sep+"chr"+str(chr_no)
         bed_data_extract_to_methy(str(chr_no),input_file_path,out_put_file_path,standard=standard)
 if __name__ == '__main__':
-    input_bed_path="ENCSR617FKV_rep1_2_bismark_biorep_CpG.bed"
+    input_bed_path="GSM1386027_E135M_mc_CG_plus.bed"
     chr_no_list = range(1,2)
-    out_dir_path = "human_splitted_bed"
-    batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path,standard=True)
+    out_dir_path = "E135M"
+    batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path,standard=False)

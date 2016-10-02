@@ -124,14 +124,14 @@ def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_wi
                 print "finish chr%s d=%d run , r_d=%f" % (str(chr_no), d, r_d)
         out_R_d_file.close()
 if __name__ == '__main__':
-    input_dir = "human_splitted_bed"
+    input_dir = "E135M"
     chr_no_list = range(1, 2)
     d_max = 1000
     is_inter_with_other_cpg = True
     ignore_d = True
     standard=False
     standard_file_end=["_plus","_minus"]
-    out_corr_dir="mouse"+os.sep+"corr"
+    out_corr_dir=input_dir+os.sep+"corr"
     # 如果文件夹不存在则应先创建
     if not os.path.exists(out_corr_dir):
         os.makedirs(out_corr_dir)
@@ -143,5 +143,5 @@ if __name__ == '__main__':
                 calc_correlation(chr_i,bed_file,our_rd_path,d_max,is_inter_with_other_cpg,ignore_d)
         else:
             bed_file = "chr1.bed"#input_dir + os.sep + "chr" + str(chr_i) + ".bed"
-            our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without_cd_intuitive.csv"
+            our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
             calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,rd=1, ignore_d=ignore_d)
