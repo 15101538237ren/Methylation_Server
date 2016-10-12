@@ -1,6 +1,6 @@
 real_chr_pos=True
-rd_data_name="chr1_experiment_2_pat.csv"
-OUTPUT_DIR_first="reaction_param_compare_2cell_pat1"
+rd_data_name="chr1_experiment_without.csv"
+OUTPUT_DIR_first="2cell_paternal_fit"
 input_bed_file_path="chr1.bed"
 simulation_round_start=1
 simulation_round_end=1
