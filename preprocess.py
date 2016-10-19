@@ -72,10 +72,10 @@ def batch_bed_to_methy(input_file_path,chr_no_list,out_dir,standard=False):
     #遍历染色体列表
     for chr_no in chr_no_list:
         #每条染色体执行一遍提取bed数据操作输出到out_put_file_path
-        out_put_file_path=out_dir+os.sep+"chr"+str(chr_no)
+        out_put_file_path=out_dir+os.sep+"chr"+str(chr_no)+".bed"
         bed_data_extract_to_methy(str(chr_no),input_file_path,out_put_file_path,standard=standard)
 if __name__ == '__main__':
-    input_bed_path="GSM1386027_E135M_mc_CG_plus.bed"
-    chr_no_list = range(1,2)
-    out_dir_path = "E135M"
+    input_bed_path="GSM1386021_2cell_mc_CG_paternal_plus.bed"
+    chr_no_list = range(19,20)
+    out_dir_path = "2 cell paternal"
     batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path,standard=False)
