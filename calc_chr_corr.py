@@ -6,6 +6,7 @@ TYPE_CPG_TXT="CpG_txt"
 TYPE_NORMAL="normal"
 TYPE_BS_CG_TXT="TYPE_BS_CG_TXT"
 TYPE_ENCODE_BED="TYPE_ENCODE_BED"
+TYPE_WGBS="TYPE_WGBS"
 def variable_wig_data_extract_to_methy_normal(in_file_path,out_dir_path):
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)
@@ -62,7 +63,7 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
     find=0
 
     chr_no=str(chr_no)
-    type,pattern,methy_pos_index,value_index=ENCODE_bed_pattern(chr_no)
+    type,pattern,methy_pos_index,value_index=WGBS_bed_pattern(chr_no)
 
     line=raw_file.readline()
     while line:
@@ -86,7 +87,7 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
                     value = 0.0
                 out_str = str(methy_pos) + "\t" + str(value) + "\n"
                 methy_file1.write(out_str)
-            elif type==TYPE_ENCODE_BED:
+            elif type==TYPE_ENCODE_BED or type==TYPE_WGBS:
                 value = float(match_p.group(value_index))/100.0
                 out_str = str(methy_pos) + "\t" + str(value) + "\n"
                 methy_file1.write(out_str)
@@ -151,6 +152,12 @@ def normal_bed_pattern(chr_no):
     methy_pos_index=1
     value_index=5
     type=TYPE_NORMAL
+    return type,pattern,methy_pos_index,value_index
+def WGBS_bed_pattern(chr_no):
+    pattern=r'chr' + chr_no + r'\t(\d+)(\s)(\d+)(\s)([\d]+[\.[\d]*]?)(\s)(\d+)(\s)(\d+)'
+    methy_pos_index=1
+    value_index=5
+    type=TYPE_WGBS
     return type,pattern,methy_pos_index,value_index
 def ENCODE_bed_pattern(chr_no):
     pattern=r'chr' + chr_no + r'\t(\d+)\t(\d+)\t\.\t(\d+)\t\+\t(\d+)\t(\d+)\t(\d+),(\d+),(\d+)\t(\d+)\t(\d+)'
@@ -367,13 +374,13 @@ def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_wi
                 print "finish chr%d d=%d run , r_d=%f" % (chr_no, d, r_d)
         out_R_d_file.close()
 if __name__ == '__main__':
-    input_bed_path="GSM2138752_ENCFF774GXJ_methylation_state_at_CpG_GRCh38.bed"
-    # chr_no_list = range(1,2)
-    out_dir_path = "GSM2138752"
+    input_bed_path="GSM2067971_WGBS_CD8.txt"
+    chr_no_list = range(1,2)
+    out_dir_path = "GSM2067971"
     out_bed_path=out_dir_path+os.sep+"splitted_bed"
-    # batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path)
+    batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path)
     # variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
-    ENCODE_methy_data_extract(input_bed_path,out_dir_path)
+    # ENCODE_methy_data_extract(input_bed_path,out_dir_path)
     # d_max = 1000
     # is_inter_with_other_cpg = False
     # ignore_d = False
