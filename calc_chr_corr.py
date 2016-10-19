@@ -7,6 +7,7 @@ TYPE_NORMAL="normal"
 TYPE_BS_CG_TXT="TYPE_BS_CG_TXT"
 TYPE_ENCODE_BED="TYPE_ENCODE_BED"
 TYPE_WGBS="TYPE_WGBS"
+TYPE_ALL_C="TYPE_ALL_C"
 def variable_wig_data_extract_to_methy_normal(in_file_path,out_dir_path):
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)
@@ -18,7 +19,7 @@ def variable_wig_data_extract_to_methy_normal(in_file_path,out_dir_path):
     #写入的文件路径
     out_file_pre_path=out_dir_path+os.sep+"chr"
 
-    methy_file1 = open("tst.txt",'w')
+    methy_file1 = open(out_file_pre_path+"1.bed",'w')
 
     count=0
     chr_no=0
@@ -26,7 +27,7 @@ def variable_wig_data_extract_to_methy_normal(in_file_path,out_dir_path):
 
     line=raw_file.readline()
     while line:
-        if count % 10000000==0:
+        if count % 1000000==0:
             print "%d lines of %s was processed" %(count,in_file_path)
         match_p = re.search(pattern,line)
         if not match_p:
@@ -49,21 +50,26 @@ def variable_wig_data_extract_to_methy_normal(in_file_path,out_dir_path):
     raw_file.close()
     print "finish %s chr%s data processing!" %(in_file_path,chr_no)
 
-def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
+def bed_data_extract_to_methy(in_file_path,outdir_path,pattern_type):
+    #如果文件夹不存在则应先创建
+    if not os.path.exists(outdir_path):
+        os.makedirs(outdir_path)
     #读入的文件路径
     raw_file = open(in_file_path,'r')
 
     #文件样例格式:chr1  3025349	3025350	0.6	3	2.染色体编号,CpG起始位点,CpG结束位点,甲基化水平,甲基化的reads数,未甲基化的reads数
 
     #写入的文件路径
+    #写入的文件路径
+    out_file_pre_path=outdir_path+os.sep+"chr"
 
-    methy_file1 = open(outfile_path,'w')
+    methy_file1 = open(out_file_pre_path+"1.bed",'w')
 
     count=0
-    find=0
 
-    chr_no=str(chr_no)
-    type,pattern,methy_pos_index,value_index=WGBS_bed_pattern(chr_no)
+    chr_no=0
+    chr_no_index=1
+    type,pattern,methy_pos_index,value_index=pattern_generate(pattern_type)
 
     line=raw_file.readline()
     while line:
@@ -71,7 +77,15 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
         if count % 100000==0:
             print "%d lines of %s was processed" %(count,in_file_path)
         match_p = re.search(pattern,line)
+
         if match_p:
+            now_chr_no=int(match_p.group(chr_no_index))
+            if chr_no!=now_chr_no:
+                chr_no=now_chr_no
+                print "now chr "+str(now_chr_no)
+                out_file_path=out_file_pre_path+str(now_chr_no)+".bed"
+                methy_file1.close()
+                methy_file1=open(out_file_path,"w")
             methy_pos = int(match_p.group(methy_pos_index))
             if type ==TYPE_CPG_TXT:
                 if match_p.group(3)=="F":
@@ -95,17 +109,52 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
                 value = float(match_p.group(value_index))
                 out_str = str(methy_pos) + "\t" + str(value) + "\n"
                 methy_file1.write(out_str)
-
-            if find == 0:
-                find = 1
-        #后边没有在match的CpG位点了
-        elif find==1 and not match_p:
-            break
         line=raw_file.readline()
     methy_file1.close()
     raw_file.close()
     print "finish %s chr%s data processing!" %(in_file_path,chr_no)
-def ENCODE_methy_data_extract(in_file_path,out_dir_path):
+def pattern_generate(type):
+    if type==TYPE_NORMAL:
+        return normal_bed_pattern()
+    elif type==TYPE_WGBS:
+        return WGBS_bed_pattern()
+    elif type==TYPE_ENCODE_BED:
+        return ENCODE_bed_pattern()
+    elif type==TYPE_BS_CG_TXT:
+        return bs_cg_txt_pattern()
+    elif type==TYPE_CPG_TXT:
+        return CpG_txt_pattern()
+def normal_bed_pattern():
+    pattern=r'chr(\d+)\t(\d+)(\s)(\d+)(\s)([\d]+[\.[\d]*]?)(\s)(\d+)(\s)(\d+)'
+    methy_pos_index=2
+    value_index=6
+    type=TYPE_NORMAL
+    return type,pattern,methy_pos_index,value_index
+def WGBS_bed_pattern():
+    pattern=r'chr(\d+)\t(\d+)(\s)(\d+)(\s)([\d]+[\.[\d]*]?)(\s)(\d+)(\s)(\d+)'
+    methy_pos_index=2
+    value_index=6
+    type=TYPE_WGBS
+    return type,pattern,methy_pos_index,value_index
+def ENCODE_bed_pattern():
+    pattern=r'chr(\d+)\t(\d+)\t(\d+)\t\.\t(\d+)\t\+\t(\d+)\t(\d+)\t(\d+),(\d+),(\d+)\t(\d+)\t(\d+)'
+    methy_pos_index=2
+    value_index=11
+    type=TYPE_ENCODE_BED
+    return type,pattern,methy_pos_index,value_index
+def bs_cg_txt_pattern():
+    pattern=r'chr(\d+)\t(\d+)\s(\d+)\s(\d+)'
+    methy_pos_index=2
+    value_index=3
+    type=TYPE_BS_CG_TXT
+    return type,pattern,methy_pos_index,value_index
+def CpG_txt_pattern():
+    pattern=r'[^\s]+\s(\d+)\s(\d+)\s(F|R)\s(\d+)\s([\d]+[\.[\d]*]?)(\s)([\d]+[\.[\d]*]?)'
+    methy_pos_index=2
+    value_index=5
+    type=TYPE_CPG_TXT
+    return type,pattern,methy_pos_index,value_index
+def bed_data_extract_to_methy_all_C(in_file_path,out_dir_path):
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)
     #读入的文件路径
@@ -114,84 +163,16 @@ def ENCODE_methy_data_extract(in_file_path,out_dir_path):
     #文件样例格式:chr1  3025349	3025350	0.6	3	2.染色体编号,CpG起始位点,CpG结束位点,甲基化水平,甲基化的reads数,未甲基化的reads数
 
     #写入的文件路径
-    out_file_pre_path=out_dir_path+os.sep+"chr"
-
-    methy_file1 = open("tst.txt",'w')
-
-    count=0
-    chr_no=0
-    pattern=r'chr(\d+)\t(\d+)\t(\d+)\t\.\t(\d+)\t\+\t(\d+)\t(\d+)\t(\d+),(\d+),(\d+)\t(\d+)\t(\d+)'
-    chr_no_index=1
-    methy_pos_index=2
-    value_index=11
-
-    line=raw_file.readline()
-    while line:
-        if count % 10000000==0:
-            print "%d lines of %s was processed" %(count,in_file_path)
-        match_p = re.search(pattern,line)
-        if match_p:
-            count=count+1
-            now_chr_no=int(match_p.group(chr_no_index))
-            if chr_no!=now_chr_no:
-                chr_no=now_chr_no
-                print "now chr "+str(now_chr_no)
-                out_file_path=out_file_pre_path+str(now_chr_no)+".bed"
-                methy_file1.close()
-                methy_file1=open(out_file_path,"w")
-            methy_pos = int(match_p.group(methy_pos_index))
-            value = float(match_p.group(value_index))
-            out_str = str(methy_pos) + "\t" + str(value) + "\n"
-            methy_file1.write(out_str)
-        line=raw_file.readline()
-    methy_file1.close()
-    raw_file.close()
-    print "finish %s chr%s data processing!" %(in_file_path,chr_no)
-def normal_bed_pattern(chr_no):
-    pattern=r'chr' + chr_no + r'\t(\d+)(\s)(\d+)(\s)([\d]+\.[\d]*)(\s)(\d+)(\s)(\d+)'
-    methy_pos_index=1
-    value_index=5
-    type=TYPE_NORMAL
-    return type,pattern,methy_pos_index,value_index
-def WGBS_bed_pattern(chr_no):
-    pattern=r'chr' + chr_no + r'\t(\d+)(\s)(\d+)(\s)([\d]+[\.[\d]*]?)(\s)(\d+)(\s)(\d+)'
-    methy_pos_index=1
-    value_index=5
-    type=TYPE_WGBS
-    return type,pattern,methy_pos_index,value_index
-def ENCODE_bed_pattern(chr_no):
-    pattern=r'chr' + chr_no + r'\t(\d+)\t(\d+)\t\.\t(\d+)\t\+\t(\d+)\t(\d+)\t(\d+),(\d+),(\d+)\t(\d+)\t(\d+)'
-    methy_pos_index=1
-    value_index=10
-    type=TYPE_ENCODE_BED
-    return type,pattern,methy_pos_index,value_index
-def bs_cg_txt_pattern(chr_no):
-    pattern=r'chr' + chr_no + r'\t(\d+)\s(\d+)\s(\d+)'
-    methy_pos_index=1
-    value_index=2
-    type=TYPE_BS_CG_TXT
-    return type,pattern,methy_pos_index,value_index
-def CpG_txt_pattern(chr_no):
-    pattern=r'[^\s]+\s('+ chr_no + r')\s(\d+)\s(F|R)\s(\d+)\s([\d]+\.[\d]*)(\s)([\d]+\.[\d]*)'
-    methy_pos_index=2
-    value_index=5
-    type=TYPE_CPG_TXT
-    return type,pattern,methy_pos_index,value_index
-def bed_data_extract_to_methy_all_C(chr_no,in_file_path,outfile_path):
-    #读入的文件路径
-    raw_file = open(in_file_path,'r')
-
-    #文件样例格式:chr1  3025349	3025350	0.6	3	2.染色体编号,CpG起始位点,CpG结束位点,甲基化水平,甲基化的reads数,未甲基化的reads数
 
     #写入的文件路径
+    out_file_pre_path=out_dir_path+os.sep+"chr"
 
-    methy_file1 = open(outfile_path,'w')
+    methy_file1 = open(out_file_pre_path+"1.bed",'w')
 
+    chr_no=0
     count=0
-    find=0
 
-    chr_no=str(chr_no)
-    pattern=r'('+chr_no + r')\t(\d+)\s([-|+])\s(CHG|CHH|CG)\s(\d+)\s(\d+)'
+    pattern=r'(\d+)\t(\d+)\s([-|+])\s(CHG|CHH|CG)\s(\d+)\s(\d+)'
 
     line=raw_file.readline()
     methylation_total=0
@@ -199,10 +180,16 @@ def bed_data_extract_to_methy_all_C(chr_no,in_file_path,outfile_path):
     methylation_position=0
     while line:
         count=count+1
-        if count % 100000==0:
+        if count % 1000000==0:
             print "%d lines of %s was processed" %(count,in_file_path)
         match_p = re.search(pattern,line)
         chr_no_of_line=int(match_p.group(1))
+        if chr_no!=chr_no_of_line:
+            chr_no=chr_no_of_line
+            print "now chr "+str(chr_no_of_line)
+            out_file_path=out_file_pre_path+str(chr_no_of_line)+".bed"
+            methy_file1.close()
+            methy_file1=open(out_file_path,"w")
         CG=match_p.group(4)
         if match_p and CG=="CG":
             strand=match_p.group(3)
@@ -235,25 +222,11 @@ def bed_data_extract_to_methy_all_C(chr_no,in_file_path,outfile_path):
                 methylation_total=0
                 methylated_total=0
                 methylation_position=0
-            if find == 0:
-                find = 1
-        #后边没有在match的CpG位点了
-        elif find==1 and (chr_no_of_line!=int(chr_no)):
-            break
         line=raw_file.readline()
     methy_file1.close()
     raw_file.close()
-    print "finish %s chr%s data processing!" %(in_file_path,chr_no)
+    print "finish %s chr%d data processing!" %(in_file_path,chr_no)
 
-def batch_bed_to_methy(input_file_path,chr_no_list,out_dir):
-    #如果文件夹不存在则应先创建
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    #遍历染色体列表
-    for chr_no in chr_no_list:
-        #每条染色体执行一遍提取bed数据操作输出到out_put_file_path
-        out_put_file_path=out_dir+os.sep+"chr"+str(chr_no)+".bed"
-        bed_data_extract_to_methy_normal(str(chr_no),input_file_path,out_put_file_path)
 def read_bed_file_and_store_pos_to_a_struct(bedfile_path, ignore_d=False):
         struct_to_store = {}
         bed_file = open(bedfile_path, 'r')
@@ -374,12 +347,82 @@ def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_wi
                 print "finish chr%d d=%d run , r_d=%f" % (chr_no, d, r_d)
         out_R_d_file.close()
 if __name__ == '__main__':
-    input_bed_path="GSM2067971_WGBS_CD8.txt"
-    chr_no_list = range(1,2)
-    out_dir_path = "GSM2067971"
-    out_bed_path=out_dir_path+os.sep+"splitted_bed"
-    batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path)
-    # variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
+
+    bs_cg_txt_base="Homosapiens"+os.sep+"GSE70090"
+    bs_cg_txt_list=os.listdir(bs_cg_txt_base)
+
+    for item in bs_cg_txt_list:
+        if os.path.isfile(os.path.join(bs_cg_txt_base,item)):
+            if item.split(".")[-1]=="txt":
+                input_bed_path=bs_cg_txt_base+os.sep+item
+                out_dir_path = item.split(".")[0]
+                print "now handle %s" % out_dir_path
+                out_bed_path=bs_cg_txt_base+os.sep+out_dir_path+os.sep+"splitted_bed"
+                pattern_type=TYPE_BS_CG_TXT
+                bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+
+    # cpg_txt_base="Daniorerio"+os.sep+"GSE59916"
+    # cpg_txt_list=os.listdir(cpg_txt_base)
+    # #
+    # for item in cpg_txt_list:
+    #     if os.path.isfile(os.path.join(cpg_txt_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=cpg_txt_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_bed_path=cpg_txt_base+os.sep+out_dir_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_CPG_TXT
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+    #
+    #
+    # all_c_txt_base="Daniorerio"+os.sep+"GSE68087"
+    # all_c_txt_list=os.listdir(all_c_txt_base)
+    #
+    # for item in all_c_txt_list:
+    #     if os.path.isfile(os.path.join(all_c_txt_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=all_c_txt_base+os.sep+item
+    #             chr_no_list = range(1,26)
+    #             out_dir_path = item.split(".")[0]
+    #             pattern_type=TYPE_ALL_C
+    #             out_bed_path=all_c_txt_base+os.sep+out_dir_path+os.sep+"splitted_bed"
+    #             bed_data_extract_to_methy_all_C(input_bed_path,out_bed_path)
+    #
+    # encode_bed_type_base="Homosapiens"+os.sep+"encode_bed_type"
+    # encode_bed_type_list=os.listdir(encode_bed_type_base)
+    #
+    # for item in encode_bed_type_list:
+    #     if os.path.isfile(os.path.join(encode_bed_type_base,item)):
+    #         if item.split(".")[-1]=="bed":
+    #             input_bed_path=encode_bed_type_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_bed_path=encode_bed_type_base+os.sep+out_dir_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_ENCODE_BED
+    #             # batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path,pattern_type)
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+    #
+    # wig_type_base="Homosapiens"+os.sep+"wig_type"
+    # wig_type_list=os.listdir(wig_type_base)
+    #
+    # for item in wig_type_list:
+    #     if os.path.isfile(os.path.join(wig_type_base,item)):
+    #         if item.split(".")[-1]=="wig":
+    #             input_bed_path=wig_type_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_bed_path=wig_type_base+os.sep+out_dir_path+os.sep+"splitted_bed"
+    #             variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
+    #
+    # WGBS_type_base="Musmusculus"
+    # WGBS_type_list=os.listdir(WGBS_type_base)
+    #
+    # for item in WGBS_type_list:
+    #     if os.path.isfile(os.path.join(WGBS_type_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=WGBS_type_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_bed_path=WGBS_type_base+os.sep+out_dir_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_WGBS
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+
     # ENCODE_methy_data_extract(input_bed_path,out_dir_path)
     # d_max = 1000
     # is_inter_with_other_cpg = False
