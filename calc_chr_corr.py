@@ -5,6 +5,7 @@ import numpy as np
 TYPE_CPG_TXT="CpG_txt"
 TYPE_NORMAL="normal"
 TYPE_BS_CG_TXT="TYPE_BS_CG_TXT"
+TYPE_ENCODE_BED="TYPE_ENCODE_BED"
 def variable_wig_data_extract_to_methy_normal(in_file_path,out_dir_path):
     if not os.path.exists(out_dir_path):
         os.makedirs(out_dir_path)
@@ -61,7 +62,7 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
     find=0
 
     chr_no=str(chr_no)
-    type,pattern,methy_pos_index,value_index=bs_cg_txt_pattern(chr_no)
+    type,pattern,methy_pos_index,value_index=ENCODE_bed_pattern(chr_no)
 
     line=raw_file.readline()
     while line:
@@ -85,6 +86,10 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
                     value = 0.0
                 out_str = str(methy_pos) + "\t" + str(value) + "\n"
                 methy_file1.write(out_str)
+            elif type==TYPE_ENCODE_BED:
+                value = float(match_p.group(value_index))/100.0
+                out_str = str(methy_pos) + "\t" + str(value) + "\n"
+                methy_file1.write(out_str)
             else:
                 value = float(match_p.group(value_index))
                 out_str = str(methy_pos) + "\t" + str(value) + "\n"
@@ -99,11 +104,59 @@ def bed_data_extract_to_methy_normal(chr_no,in_file_path,outfile_path):
     methy_file1.close()
     raw_file.close()
     print "finish %s chr%s data processing!" %(in_file_path,chr_no)
+def ENCODE_methy_data_extract(in_file_path,out_dir_path):
+    if not os.path.exists(out_dir_path):
+        os.makedirs(out_dir_path)
+    #读入的文件路径
+    raw_file = open(in_file_path,'r')
+
+    #文件样例格式:chr1  3025349	3025350	0.6	3	2.染色体编号,CpG起始位点,CpG结束位点,甲基化水平,甲基化的reads数,未甲基化的reads数
+
+    #写入的文件路径
+    out_file_pre_path=out_dir_path+os.sep+"chr"
+
+    methy_file1 = open("tst.txt",'w')
+
+    count=0
+    chr_no=0
+    pattern=r'chr(\d+)\t(\d+)\t(\d+)\t\.\t(\d+)\t\+\t(\d+)\t(\d+)\t(\d+),(\d+),(\d+)\t(\d+)\t(\d+)'
+    chr_no_index=1
+    methy_pos_index=2
+    value_index=11
+
+    line=raw_file.readline()
+    while line:
+        if count % 10000000==0:
+            print "%d lines of %s was processed" %(count,in_file_path)
+        match_p = re.search(pattern,line)
+        if match_p:
+            count=count+1
+            now_chr_no=int(match_p.group(chr_no_index))
+            if chr_no!=now_chr_no:
+                chr_no=now_chr_no
+                print "now chr "+str(now_chr_no)
+                out_file_path=out_file_pre_path+str(now_chr_no)+".bed"
+                methy_file1.close()
+                methy_file1=open(out_file_path,"w")
+            methy_pos = int(match_p.group(methy_pos_index))
+            value = float(match_p.group(value_index))
+            out_str = str(methy_pos) + "\t" + str(value) + "\n"
+            methy_file1.write(out_str)
+        line=raw_file.readline()
+    methy_file1.close()
+    raw_file.close()
+    print "finish %s chr%s data processing!" %(in_file_path,chr_no)
 def normal_bed_pattern(chr_no):
     pattern=r'chr' + chr_no + r'\t(\d+)(\s)(\d+)(\s)([\d]+\.[\d]*)(\s)(\d+)(\s)(\d+)'
     methy_pos_index=1
     value_index=5
     type=TYPE_NORMAL
+    return type,pattern,methy_pos_index,value_index
+def ENCODE_bed_pattern(chr_no):
+    pattern=r'chr' + chr_no + r'\t(\d+)\t(\d+)\t\.\t(\d+)\t\+\t(\d+)\t(\d+)\t(\d+),(\d+),(\d+)\t(\d+)\t(\d+)'
+    methy_pos_index=1
+    value_index=10
+    type=TYPE_ENCODE_BED
     return type,pattern,methy_pos_index,value_index
 def bs_cg_txt_pattern(chr_no):
     pattern=r'chr' + chr_no + r'\t(\d+)\s(\d+)\s(\d+)'
@@ -314,12 +367,13 @@ def calc_correlation(chr_no,bed_file_path, out_R_d_file_path, d_max, is_inter_wi
                 print "finish chr%d d=%d run , r_d=%f" % (chr_no, d, r_d)
         out_R_d_file.close()
 if __name__ == '__main__':
-    input_bed_path="GSM916052_BI.Mobilized_CD34_Primary_Cells.Bisulfite-Seq.RO_01549.wig"
-    chr_no_list = range(1,2)
-    out_dir_path = "GSM916052"
+    input_bed_path="GSM2138752_ENCFF774GXJ_methylation_state_at_CpG_GRCh38.bed"
+    # chr_no_list = range(1,2)
+    out_dir_path = "GSM2138752"
     out_bed_path=out_dir_path+os.sep+"splitted_bed"
     # batch_bed_to_methy(input_bed_path,chr_no_list, out_dir_path)
-    variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
+    # variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
+    ENCODE_methy_data_extract(input_bed_path,out_dir_path)
     # d_max = 1000
     # is_inter_with_other_cpg = False
     # ignore_d = False
