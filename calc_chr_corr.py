@@ -183,45 +183,47 @@ def bed_data_extract_to_methy_all_C(in_file_path,out_dir_path):
         if count % 1000000==0:
             print "%d lines of %s was processed" %(count,in_file_path)
         match_p = re.search(pattern,line)
-        chr_no_of_line=int(match_p.group(1))
-        if chr_no!=chr_no_of_line:
-            chr_no=chr_no_of_line
-            print "now chr "+str(chr_no_of_line)
-            out_file_path=out_file_pre_path+str(chr_no_of_line)+".bed"
-            methy_file1.close()
-            methy_file1=open(out_file_path,"w")
-        CG=match_p.group(4)
-        if match_p and CG=="CG":
-            strand=match_p.group(3)
-            tmp_pos=int(match_p.group(2))
-            tmp_methylated=int(match_p.group(5))
-            tmp_total=int(match_p.group(6))
-            #正链情况,下一次还得看看负链
-            if strand=="+":
-                #上次只有+链CpG
-                if methylation_position!=0:
-                    value=float(methylated_total)/float(methylation_total)
-                    out_str = str(methylation_position) + "\t" + str(value) + "\n"
-                    methy_file1.write(out_str)
-                methylation_position=tmp_pos
-                methylated_total=tmp_methylated
-                methylation_total=tmp_total
-            elif strand=="-":
-                #上行有正链CpG
-                if methylation_position!=0:
-                    methylated_total=methylated_total+tmp_methylated
-                    methylation_total=methylation_total+tmp_total
-                #只有负链CpG
-                else:
+
+        if match_p:
+            chr_no_of_line=int(match_p.group(1))
+            if chr_no!=chr_no_of_line:
+                chr_no=chr_no_of_line
+                print "now chr "+str(chr_no_of_line)
+                out_file_path=out_file_pre_path+str(chr_no_of_line)+".bed"
+                methy_file1.close()
+                methy_file1=open(out_file_path,"w")
+            CG=match_p.group(4)
+            if CG=="CG":
+                strand=match_p.group(3)
+                tmp_pos=int(match_p.group(2))
+                tmp_methylated=int(match_p.group(5))
+                tmp_total=int(match_p.group(6))
+                #正链情况,下一次还得看看负链
+                if strand=="+":
+                    #上次只有+链CpG
+                    if methylation_position!=0:
+                        value=float(methylated_total)/float(methylation_total)
+                        out_str = str(methylation_position) + "\t" + str(value) + "\n"
+                        methy_file1.write(out_str)
                     methylation_position=tmp_pos
                     methylated_total=tmp_methylated
                     methylation_total=tmp_total
-                value=float(methylated_total)/float(methylation_total)
-                out_str = str(methylation_position) + "\t" + str(value) + "\n"
-                methy_file1.write(out_str)
-                methylation_total=0
-                methylated_total=0
-                methylation_position=0
+                elif strand=="-":
+                    #上行有正链CpG
+                    if methylation_position!=0:
+                        methylated_total=methylated_total+tmp_methylated
+                        methylation_total=methylation_total+tmp_total
+                    #只有负链CpG
+                    else:
+                        methylation_position=tmp_pos
+                        methylated_total=tmp_methylated
+                        methylation_total=tmp_total
+                    value=float(methylated_total)/float(methylation_total)
+                    out_str = str(methylation_position) + "\t" + str(value) + "\n"
+                    methy_file1.write(out_str)
+                    methylation_total=0
+                    methylated_total=0
+                    methylation_position=0
         line=raw_file.readline()
     methy_file1.close()
     raw_file.close()
@@ -352,99 +354,100 @@ if __name__ == '__main__':
     ignore_d = False
 
 
+    # cpg_txt_base="Daniorerio"+os.sep+"GSE59916"
+    # cpg_txt_list=os.listdir(cpg_txt_base)
+    # #
+    # for item in cpg_txt_list:
+    #     if os.path.isfile(os.path.join(cpg_txt_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=cpg_txt_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_dir_full_path=cpg_txt_base+os.sep+out_dir_path
+    #             print "now handle %s" % out_dir_path
+    #             out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_CPG_TXT
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+    #             out_corr_dir=out_dir_full_path+os.sep+"correlation"
+    #             # 如果文件夹不存在则应先创建
+    #             if not os.path.exists(out_corr_dir):
+    #                 os.makedirs(out_corr_dir)
+    #             chr_no_list=range(1,26)
+    #             for chr_i in chr_no_list:
+    #                 bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
+    #                 our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
+    #                 calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
 
-    bs_cg_txt_base="Homosapiens"+os.sep+"GSE70090"
-    bs_cg_txt_list=os.listdir(bs_cg_txt_base)
-    for item in bs_cg_txt_list:
-        if os.path.isfile(os.path.join(bs_cg_txt_base,item)):
-            if item.split(".")[-1]=="txt":
-                input_bed_path=bs_cg_txt_base+os.sep+item
-                out_dir_path = item.split(".")[0]
-                out_dir_full_path=bs_cg_txt_base+os.sep+out_dir_path
-                print "now handle %s" % out_dir_path
-                out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
-                pattern_type=TYPE_BS_CG_TXT
-                bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
-                out_corr_dir=out_dir_full_path+os.sep+"correlation"
-                # 如果文件夹不存在则应先创建
-                if not os.path.exists(out_corr_dir):
-                    os.makedirs(out_corr_dir)
-                chr_no_list=range(1,23)
-                for chr_i in chr_no_list:
-                    bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
-                    our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
-                    calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
 
-    cpg_txt_base="Daniorerio"+os.sep+"GSE59916"
-    cpg_txt_list=os.listdir(cpg_txt_base)
+    # all_c_txt_base="Daniorerio"+os.sep+"GSE68087"
+    # all_c_txt_list=os.listdir(all_c_txt_base)
     #
-    for item in cpg_txt_list:
-        if os.path.isfile(os.path.join(cpg_txt_base,item)):
-            if item.split(".")[-1]=="txt":
-                input_bed_path=cpg_txt_base+os.sep+item
-                out_dir_path = item.split(".")[0]
-                out_dir_full_path=cpg_txt_base+os.sep+out_dir_path
-                print "now handle %s" % out_dir_path
-                out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
-                pattern_type=TYPE_CPG_TXT
-                bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
-                out_corr_dir=out_dir_full_path+os.sep+"correlation"
-                # 如果文件夹不存在则应先创建
-                if not os.path.exists(out_corr_dir):
-                    os.makedirs(out_corr_dir)
-                chr_no_list=range(1,26)
-                for chr_i in chr_no_list:
-                    bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
-                    our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
-                    calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
+    # for item in all_c_txt_list:
+    #     if os.path.isfile(os.path.join(all_c_txt_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=all_c_txt_base+os.sep+item
+    #             chr_no_list = range(1,26)
+    #             out_dir_path = item.split(".")[0]
+    #             pattern_type=TYPE_ALL_C
+    #             out_dir_full_path=all_c_txt_base+os.sep+out_dir_path
+    #             if not os.path.exists(out_dir_full_path):
+    #                 print "now handle %s" % out_dir_path
+    #                 out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
+    #                 bed_data_extract_to_methy_all_C(input_bed_path,out_bed_path)
+    #                 out_corr_dir=out_dir_full_path+os.sep+"correlation"
+    #                 # 如果文件夹不存在则应先创建
+    #                 if not os.path.exists(out_corr_dir):
+    #                     os.makedirs(out_corr_dir)
+    #                 chr_no_list=range(1,26)
+    #                 for chr_i in chr_no_list:
+    #                     bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
+    #                     our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
+    #                     calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
+
+    # WGBS_type_base="Musmusculus"
+    # WGBS_type_list=os.listdir(WGBS_type_base)
+    #
+    # for item in WGBS_type_list:
+    #     if os.path.isfile(os.path.join(WGBS_type_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=WGBS_type_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_dir_full_path=WGBS_type_base+os.sep+out_dir_path
+    #             print "now handle %s" % out_dir_path
+    #             out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_WGBS
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+    #             out_corr_dir=out_dir_full_path+os.sep+"correlation"
+    #             # 如果文件夹不存在则应先创建
+    #             if not os.path.exists(out_corr_dir):
+    #                 os.makedirs(out_corr_dir)
+    #             chr_no_list=range(1,20)
+    #             for chr_i in chr_no_list:
+    #                 bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
+    #                 our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
+    #                 calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
 
 
-    all_c_txt_base="Daniorerio"+os.sep+"GSE68087"
-    all_c_txt_list=os.listdir(all_c_txt_base)
-
-    for item in all_c_txt_list:
-        if os.path.isfile(os.path.join(all_c_txt_base,item)):
-            if item.split(".")[-1]=="txt":
-                input_bed_path=all_c_txt_base+os.sep+item
-                chr_no_list = range(1,26)
-                out_dir_path = item.split(".")[0]
-                pattern_type=TYPE_ALL_C
-                out_dir_full_path=all_c_txt_base+os.sep+out_dir_path
-                print "now handle %s" % out_dir_path
-                out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
-                bed_data_extract_to_methy_all_C(input_bed_path,out_bed_path)
-                out_corr_dir=out_dir_full_path+os.sep+"correlation"
-                # 如果文件夹不存在则应先创建
-                if not os.path.exists(out_corr_dir):
-                    os.makedirs(out_corr_dir)
-                chr_no_list=range(1,26)
-                for chr_i in chr_no_list:
-                    bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
-                    our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
-                    calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
-
-    encode_bed_type_base="Homosapiens"+os.sep+"encode_bed_type"
-    encode_bed_type_list=os.listdir(encode_bed_type_base)
-
-    for item in encode_bed_type_list:
-        if os.path.isfile(os.path.join(encode_bed_type_base,item)):
-            if item.split(".")[-1]=="bed":
-                input_bed_path=encode_bed_type_base+os.sep+item
-                out_dir_path = item.split(".")[0]
-                out_dir_full_path=encode_bed_type_base+os.sep+out_dir_path
-                print "now handle %s" % out_dir_path
-                out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
-                pattern_type=TYPE_ENCODE_BED
-                bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
-                out_corr_dir=out_dir_full_path+os.sep+"correlation"
-                # 如果文件夹不存在则应先创建
-                if not os.path.exists(out_corr_dir):
-                    os.makedirs(out_corr_dir)
-                chr_no_list=range(1,23)
-                for chr_i in chr_no_list:
-                    bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
-                    our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
-                    calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
+    # bs_cg_txt_base="Homosapiens"+os.sep+"GSE70090"
+    # bs_cg_txt_list=os.listdir(bs_cg_txt_base)
+    # for item in bs_cg_txt_list:
+    #     if os.path.isfile(os.path.join(bs_cg_txt_base,item)):
+    #         if item.split(".")[-1]=="txt":
+    #             input_bed_path=bs_cg_txt_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_dir_full_path=bs_cg_txt_base+os.sep+out_dir_path
+    #             print "now handle %s" % out_dir_path
+    #             out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_BS_CG_TXT
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+    #             out_corr_dir=out_dir_full_path+os.sep+"correlation"
+    #             # 如果文件夹不存在则应先创建
+    #             if not os.path.exists(out_corr_dir):
+    #                 os.makedirs(out_corr_dir)
+    #             chr_no_list=range(1,23)
+    #             for chr_i in chr_no_list:
+    #                 bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
+    #                 our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
+    #                 calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
     #
     wig_type_base="Homosapiens"+os.sep+"wig_type"
     wig_type_list=os.listdir(wig_type_base)
@@ -455,38 +458,39 @@ if __name__ == '__main__':
                 input_bed_path=wig_type_base+os.sep+item
                 out_dir_path = item.split(".")[0]
                 out_dir_full_path=wig_type_base+os.sep+out_dir_path
-                print "now handle %s" % out_dir_path
-                out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
-                variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
-                out_corr_dir=out_dir_full_path+os.sep+"correlation"
-                # 如果文件夹不存在则应先创建
-                if not os.path.exists(out_corr_dir):
-                    os.makedirs(out_corr_dir)
-                chr_no_list=range(1,23)
-                for chr_i in chr_no_list:
-                    bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
-                    our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
-                    calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
-
-    WGBS_type_base="Musmusculus"
-    WGBS_type_list=os.listdir(WGBS_type_base)
-
-    for item in WGBS_type_list:
-        if os.path.isfile(os.path.join(WGBS_type_base,item)):
-            if item.split(".")[-1]=="txt":
-                input_bed_path=WGBS_type_base+os.sep+item
-                out_dir_path = item.split(".")[0]
-                out_dir_full_path=WGBS_type_base+os.sep+out_dir_path
-                print "now handle %s" % out_dir_path
-                out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
-                pattern_type=TYPE_WGBS
-                bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
-                out_corr_dir=out_dir_full_path+os.sep+"correlation"
-                # 如果文件夹不存在则应先创建
-                if not os.path.exists(out_corr_dir):
-                    os.makedirs(out_corr_dir)
-                chr_no_list=range(1,20)
-                for chr_i in chr_no_list:
-                    bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
-                    our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
-                    calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
+                if not os.path.exists(out_dir_full_path):
+                    print "now handle %s" % out_dir_path
+                    out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
+                    variable_wig_data_extract_to_methy_normal(input_bed_path,out_bed_path)
+                    out_corr_dir=out_dir_full_path+os.sep+"correlation"
+                    # 如果文件夹不存在则应先创建
+                    if not os.path.exists(out_corr_dir):
+                        os.makedirs(out_corr_dir)
+                    chr_no_list=range(1,23)
+                    for chr_i in chr_no_list:
+                        bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
+                        our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
+                        calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
+    #
+    # encode_bed_type_base="Homosapiens"+os.sep+"encode_bed_type"
+    # encode_bed_type_list=os.listdir(encode_bed_type_base)
+    #
+    # for item in encode_bed_type_list:
+    #     if os.path.isfile(os.path.join(encode_bed_type_base,item)):
+    #         if item.split(".")[-1]=="bed":
+    #             input_bed_path=encode_bed_type_base+os.sep+item
+    #             out_dir_path = item.split(".")[0]
+    #             out_dir_full_path=encode_bed_type_base+os.sep+out_dir_path
+    #             print "now handle %s" % out_dir_path
+    #             out_bed_path=out_dir_full_path+os.sep+"splitted_bed"
+    #             pattern_type=TYPE_ENCODE_BED
+    #             bed_data_extract_to_methy(input_bed_path,out_bed_path,pattern_type)
+    #             out_corr_dir=out_dir_full_path+os.sep+"correlation"
+    #             # 如果文件夹不存在则应先创建
+    #             if not os.path.exists(out_corr_dir):
+    #                 os.makedirs(out_corr_dir)
+    #             chr_no_list=range(1,23)
+    #             for chr_i in chr_no_list:
+    #                 bed_file = out_bed_path+os.sep+ "chr" + str(chr_i) + ".bed"
+    #                 our_rd_path = out_corr_dir +os.sep+"chr"+ str(chr_i) + "_experiment_without.csv"
+    #                 calc_correlation(chr_i, bed_file, our_rd_path, d_max, is_inter_with_other_cpg,ignore_d=ignore_d)
