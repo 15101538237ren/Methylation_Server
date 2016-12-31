@@ -7,7 +7,15 @@ REACTION_STATUS_HASH={0:'H',1:'M',2:'H',3:'U',4:'M',5:'M',6:'H',7:'U',8:'H'}
 RIGHT_STATUS_OF_REACTION={0:"U",1:"H",2:"M",3:"H",4:"H",5:"H",6:"U",7:"H",8:"M"}
 STATE_OF_COLLABOR_REACTION={4:"H",5:"M",6:"M",7:"U",8:"U"}
 BASE_RATE_HASH={4:1,5:1,6:0,7:3,8:2} #collaboration reaction base reaction rate index_hash
-SORT_GEN = 49.0
+SORT_GEN = 29.0
+phid_hash_path=""
+
+beta=0
+gamma=0
+power=0
+alpha=0
+c_off=0
+
 class Simulator(object):
     '''
         This is a base class for nearby , random collaborative and traditional simulation
@@ -43,7 +51,9 @@ class Simulator(object):
             print "%d thread is needed!" % self.num_of_threads
         if self.rd_data_name!="":
             self.rd_hash=load_rd("input"+os.sep+rd_data_name)
-            self.phid_hash=load_rd("input"+os.sep+"phid_antisolved.csv")
+            global phid_hash_path
+            if phid_hash_path!="":
+                self.phid_hash=load_rd(phid_hash_path)
     def run(self):
         starttime_new=datetime.datetime.now()
         for i_round in self.rounds:
@@ -127,6 +137,8 @@ class Simulator(object):
                 U_count_statistics=U_count_statistics, cells_wait_to_add=cells_wait_to_add, nearby=nearby, detail_for_time_steps=detail_for_time_steps,
                 index_pos_list=index_pos_list,real_nearby=real_nearby)
 
+            time_collapsed = str((datetime.datetime.now() - time_old).seconds)
+
             m_means_ratio = (np.mean(np.array(M_count_statistics), axis=1) / len(init_cell)).tolist()
             h_means_ratio = (np.mean(np.array(H_count_statistics), axis=1) / len(init_cell)).tolist()
             u_means_ratio = (np.mean(np.array(U_count_statistics), axis=1) / len(init_cell)).tolist()
@@ -155,7 +167,6 @@ class Simulator(object):
             self.multi_thread_write_of_a_list(detail_file, detail_seq_str_arr)
             print "%d round:thread %d finished writing detail file!" % (times_idx, thread_no)
 
-            time_collapsed = str((datetime.datetime.now() - time_old).seconds)
             print "%d round:thread %d : %s  gen: %d, father col len:%d, sons col len:%d in %s seconds" % (
             times_idx, thread_no, exp_name, i, len(cell_collection), len(cells_wait_to_add), time_collapsed)
 
@@ -165,28 +176,36 @@ class Simulator(object):
         for idx,cell in enumerate(cell_collection): #loop cell in cell_collection
 
             out_detail_seq_arr.append([])
-
+            cell_tmp=list(cell_collection[idx])
+            len_cell=len(cell_tmp)
             for j in range(n_time_step): #loop the time step
-
-                for k in range(len(cell)): #loop for every site in a cell
+                time_old=datetime.datetime.now()
+                for k in range(len_cell): #loop for every site in a cell
                     #get the reaction site index:target_reaction_CpG_site ,and collaborative site: col_CpG_site_index
+                    time_old2=datetime.datetime.now()
+                    target_reaction_CpG_site=random.randint(0,len_cell-1)
 
-                    target_reaction_CpG_site=random.randint(0,len(cell_collection[idx])-1)
+                    # if nearby>0:
+                    #     #如果nearby_distance参数>0则取该大小范围的任意一个位点
+                    #     start=max(target_reaction_CpG_site-nearby,0)
+                    #     end=min(target_reaction_CpG_site+nearby,len_cell-1)
+                    # else:
+                    #     #如果nearby_distance参数<0,则随机一个位点
+                    #     start=0
+                    #     end=len_cell-1
 
-                    if nearby>0:
-                        #如果nearby_distance参数>0则取该大小范围的任意一个位点
-                        start=max(target_reaction_CpG_site-nearby,0)
-                        end=min(target_reaction_CpG_site+nearby,len(cell_collection[idx])-1)
+                    # col_CpG_site_index=random.randint(start,end)
+                    # while(target_reaction_CpG_site==col_CpG_site_index):
+                    #     col_CpG_site_index=random.randint(start,end)
+                    random_number_tmp = random.random()
+                    if random_number_tmp>0.5:
+                        col_CpG_site_index=max(target_reaction_CpG_site-nearby,0)
                     else:
-                        #如果nearby_distance参数<0,则随机一个位点
-                        start=0
-                        end=len(cell_collection[idx])-1
+                        col_CpG_site_index=min(target_reaction_CpG_site+nearby,len_cell-1)
 
-                    col_CpG_site_index=random.randint(start,end)
-                    while(target_reaction_CpG_site==col_CpG_site_index):
-                        col_CpG_site_index=random.randint(start,end)
                     #协作位点的状态
-                    status_of_col_site=cell_collection[idx][col_CpG_site_index]
+                    status_of_col_site=cell_tmp[col_CpG_site_index]
+
 
                     #最后根据距离算propencity_list中对应的反应概率
                     if len(index_pos_list)>0:
@@ -201,10 +220,10 @@ class Simulator(object):
                             continue
                         if distance > 997:
                             continue
-                        phi_d = self.phi(distance=distance)
+                        phi_d = self.phi(distance=distance)#100ms
 
                         pij = 1.0 #若相邻则pij=1.0
-                        propensity_tmp = self.calc_propensity_list(phi_d , PROPENCITY_LIST,pij,status_of_col_site,phi_d , phi_d)
+                        propensity_tmp = self.calc_propensity_list(phi_d , PROPENCITY_LIST,pij,status_of_col_site,phi_d , phi_d)#100ms
                     else:
                         propensity_tmp=PROPENCITY_LIST
 
@@ -217,19 +236,21 @@ class Simulator(object):
                     random_number = random.random()
 
                     #根据反应速率由Gillespie选择一个反应
-                    reaction_id = self.select_reaction(propensity_tmp, num_of_reactions, sum_propensity, random_number)
+                    reaction_id = self.select_reaction(propensity_tmp, num_of_reactions, sum_propensity, random_number)#80ms
 
                     #最后完成反应后该细胞的该位点的状态
-                    status_of_target_site=cell_collection[idx][target_reaction_CpG_site]
+                    status_of_target_site=cell_tmp[target_reaction_CpG_site]
 
                     #目标位点能否发生这个反应，不能则直接continue当前位点的尝试
+
                     if RIGHT_STATUS_OF_REACTION[reaction_id]!=status_of_target_site:
                         continue
 
-                    cell_status=cell_collection[idx]
-                    CpG_pre_str=cell_status[0:target_reaction_CpG_site]
-                    CpG_post_str = cell_status[target_reaction_CpG_site+1:len(cell_status)]
-                    cell_collection[idx]=CpG_pre_str+REACTION_STATUS_HASH[reaction_id]+CpG_post_str
+                    # cell_status=cell_collection[idx]
+                    # CpG_pre_str=cell_status[0:target_reaction_CpG_site]
+                    # CpG_post_str = cell_status[target_reaction_CpG_site+1:len(cell_status)]
+                    # cell_collection[idx]=CpG_pre_str+REACTION_STATUS_HASH[reaction_id]+CpG_post_str
+                    cell_tmp[target_reaction_CpG_site]=REACTION_STATUS_HASH[reaction_id]
 
                 if M_count_statistics!=None and H_count_statistics!=None and U_count_statistics!=None:
                     m_count=cell_collection[idx].count("M")
@@ -241,6 +262,10 @@ class Simulator(object):
                 if len(detail_for_time_steps)!=0:
                     if j+1 in detail_for_time_steps:
                         out_detail_seq_arr[idx].append(cell_collection[idx])
+                time_collapsed = str((datetime.datetime.now() - time_old).microseconds/1000.0)
+                # print "internal in %s ms" % time_collapsed
+
+            cell_collection[idx]=''.join(cell_tmp)
             cell_of_source=cell_collection[idx]
             [cell1,cell2]=self.cell_division(cell_of_source)
             cells_wait_to_add.append(cell1)
@@ -256,10 +281,10 @@ class Simulator(object):
             return 0.0
     def set_phi(self,phi):
         self.phi_param = phi
-    def phi_bk(self,d=2):
+    def phi23(self,distance=2):
         return self.phi_param
 
-    def phi(self, distance=2):
+    def phi3(self, distance=2):
         alpha1=1.0
         beta = 0.032
         gamma = 0.0065
@@ -274,6 +299,13 @@ class Simulator(object):
         c = 0.2
         rtn_phi = fx + sx + c
         return rtn_phi
+    def phi(self,distance=2):
+        global beta,gamma,power,alpha,c_off
+        fx = (1.0 / (beta + gamma * math.pow(distance,power)))
+        sx = (alpha / (30.0 * math.sqrt(2 * math.pi))) * math.exp(
+            -(distance - 160.0) * (distance - 160.0) / (2 * 30.0 * 30.0))
+        rtn_phi = fx + sx + c_off
+        return rtn_phi
     def phi2(self,distance=2):
         if self.rd_data_name!="":
             rd_d = self.rd_hash[distance]
@@ -286,7 +318,7 @@ class Simulator(object):
             return phi_d_now
         else:
             return 0.0
-    def phi_fit(self,distance=2):
+    def phi4(self,distance=2):
         if self.rd_data_name!="":
             return self.phid_hash[distance]
         else:
@@ -336,12 +368,21 @@ class Simulator(object):
         U_p_M=propensity_list[6]
         H_m_U=propensity_list[7]
         M_m_U=propensity_list[8]
+        m_filter=0.0
+        h_filter=0.0
+        u_filter=0.0
+        if xj_status =="M":
+            m_filter=1.0
+        elif xj_status =="H":
+            h_filter=1.0
+        elif xj_status =="U":
+            u_filter=1.0
 
-        u_i_plus=U_plus+pij*self.xj(xj_status,"M")*phi_plus_d*(U_p_M-U_plus)
-        h_i_plus=H_plus+pij*self.xj(xj_status,"M")*phi_plus_d*(H_p_M-H_plus)\
-                       +pij*self.xj(xj_status,"H")*phi_plus_d*(H_p_H-H_plus)
-        m_i_minus=M_minus+pij*self.xj(xj_status,"U")*phi_minus_d*(M_m_U-M_minus)
-        h_i_minus=H_minus+pij*self.xj(xj_status,"U")*phi_minus_d*(H_m_U-H_minus)
+        u_i_plus=U_plus+pij*m_filter*phi_plus_d*(U_p_M-U_plus)
+        h_i_plus=H_plus+pij*m_filter*phi_plus_d*(H_p_M-H_plus)\
+                       +pij*h_filter*phi_plus_d*(H_p_H-H_plus)
+        m_i_minus=M_minus+pij*u_filter*phi_minus_d*(M_m_U-M_minus)
+        h_i_minus=H_minus+pij*u_filter*phi_minus_d*(H_m_U-H_minus)
         return [u_i_plus,h_i_plus,m_i_minus,h_i_minus]
     def select_reaction(self,propencity_list, num_of_reactions, sum_propencity, random_number):
         reaction = -1
@@ -868,7 +909,7 @@ def start_simulation(function_util,reaction_param_file_path,reaction_param_file_
 
                 # filter_bounds = simulator.set_filter_range_bounds(m_down=float(param_hash.get("m_down")), m_up=float(param_hash.get("m_up")), h_down=float(param_hash.get("h_down")), h_up=float(param_hash.get("h_up")), u_down=float(param_hash.get("u_down")),
                 #                                                   u_up=float(param_hash.get("u_up")))
-                str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(49,number_of_generations),range(n_time_step))
+                str_list_gen=get_gens_in_dir(sorted_ratio_dir,sort_detail_dir,range(int(SORT_GEN),number_of_generations),range(n_time_step))
                 #shutil.copytree(sorted_ratio_dir, sorted_ratio_bk_dir)
                 # remained_generations = simulator.sort_the_simulaiton_result(OUTPUT_DIR, sorted_ratio_dir,
                 #                                                             sort_detail_dir, simulator.rounds[0],
@@ -903,7 +944,7 @@ def load_param_from_file(param_file_path):
     param_file.close()
     return param_hash
 def calc_mean_rd_from_rd_dir(rd_dir,out_file_path):
-    gen=49
+    gen = int(SORT_GEN)
     rd_hash={}
     rd_min_d=2
     rd_max_d=1000
@@ -933,7 +974,7 @@ def calc_mean_rd_from_rd_dir(rd_dir,out_file_path):
     print "writing mean rd finished!"
 def load_rd(rd_file_path,length=0):
     rd_file=open(rd_file_path,"r")
-    re_pattern = r'(\d+),([-]?[\d]+\.[\d]*)\s'
+    re_pattern = r'(\d+),([-]?[\d]+\.[\d]*)([^\s]+)\s'
     line = rd_file.readline()
     rd_hash={}
     counter=0
@@ -1031,7 +1072,7 @@ def median(lst):
         return lst[len(lst)/2]
     else:
         return  (lst[len(lst)/2-1]+lst[len(lst)/2])/2.0
-def calc_mean_rd_with_phi(rd_array,rep=range(10),partial=range(20),base_rd_gen=49,rd_min_count=10):
+def calc_mean_rd_with_phi(rd_array,rep=range(10),partial=range(20),base_rd_gen=int(SORT_GEN),rd_min_count=10):
     rd_mean_list=[]
     rd_median_list=[]
     rd_sum={}
@@ -1086,8 +1127,8 @@ def get_mean_rd(**param_hash):
     OUTPUT_DIR_first=str(param_hash.get("OUTPUT_DIR_first")).replace("\"","")
     rd_mean_list,rd_median_list=calc_mean_rd_with_phi(rd_array,rep=rep,partial=partial,base_rd_gen=base_rd_gen,rd_min_count=rd_min_count)
     #rd_mean_list,rd_median_list=calc_mean_rd_with_phi_in_range(rd_array,rep=rep,partial=partial,gen_range=gen_range,rd_min_count=rd_min_count)
-    out_mean_file_path=OUTPUT_DIR_first+os.sep+"mean_of_49_interval.csv"
-    out_median_file_path=OUTPUT_DIR_first+os.sep+"median_of_49_interval.csv"
+    out_mean_file_path=OUTPUT_DIR_first+os.sep+"mean_of_29_interval.csv"
+    out_median_file_path=OUTPUT_DIR_first+os.sep+"median_of_29_interval.csv"
     out_mean_file=open(out_mean_file_path,"w")
     out_median_file=open(out_median_file_path,"w")
 
@@ -1105,19 +1146,285 @@ def get_mean_rd(**param_hash):
         wrt_str=str(round(ratio,2))+","+str(rd_median)+"\n"
         out_median_file.write(wrt_str)
     out_median_file.close()
-if __name__ == '__main__':
+def main_for_reaction_param_try():
     function_util = FunctionUtil()
     param_base_path = "input_new" + os.sep
-    procedure_param_file_path = param_base_path+"seg_param.txt"
-    reaction_param_file_path = param_base_path+"phi_try_reaction.txt"
-    reaction_param_file_for_0_path = param_base_path+"phi_try_reaction.txt"
-    param_hash = load_param_from_file(procedure_param_file_path)
+    out_dir_pre="2cell_pat_"
+    merge_rd_result=False
+    get_mean_result=False
+    reaction_range=range(62,63)
+    if not merge_rd_result:
+        for reaction_number in reaction_range:
+            procedure_param_file_path = param_base_path+"reaction_param_effect.txt"
+            reaction_param_file_path = param_base_path+"reaction_"+str(reaction_number)+".txt"
+            reaction_param_file_for_0_path = param_base_path+"phi_try_reaction_0.txt"
+            param_hash = load_param_from_file(procedure_param_file_path)
 
-    start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
-    #store_rd_result(**param_hash)
-    #get_mean_rd(**param_hash)
-    name="4_maternal_formula"
-    base="D:\\Methylation_Server\\"+name+"\\repeat_1\\partial_1\\"
-    rd_dir_name=base+"rd_without"
-    out_file_path=base+name+"_mean_49.csv"
-    #calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+            param_hash["OUTPUT_DIR_first"]=out_dir_pre+"reaction_0_1_"+str(reaction_number)
+            param_hash["partial_max"]="1.0"
+            param_hash["partial"]="5"
+            param_hash["partial_start"]="1"
+            param_hash["partial_end"]="5"
+
+            if not get_mean_result:
+                start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+                param_hash["just_simulate"]="False"
+                start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+            else:
+                store_rd_result(**param_hash)
+                get_mean_rd(**param_hash)
+
+            param_hash["just_simulate"]="True"
+            param_hash["OUTPUT_DIR_first"]=out_dir_pre+"reaction_1_36_"+str(reaction_number)
+            param_hash["partial_max"]="3.6"
+            param_hash["partial"]="9"
+            param_hash["partial_start"]="3"
+            param_hash["partial_end"]="9"
+
+            if not get_mean_result:
+                start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+                param_hash["just_simulate"]="False"
+                start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+            else:
+                store_rd_result(**param_hash)
+                get_mean_rd(**param_hash)
+
+
+            param_hash["just_simulate"]="True"
+            param_hash["OUTPUT_DIR_first"]=out_dir_pre+"reaction_4_40_"+str(reaction_number)
+            param_hash["partial_max"]="40.0"
+            param_hash["partial"]="20"
+            param_hash["partial_start"]="2"
+            param_hash["partial_end"]="20"
+
+            if not get_mean_result:
+                start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+                param_hash["just_simulate"]="False"
+                start_simulation(function_util,reaction_param_file_path,reaction_param_file_for_0_path,**param_hash)
+            else:
+                store_rd_result(**param_hash)
+                get_mean_rd(**param_hash)
+    else:
+        input_dir_pre_list=[out_dir_pre+"reaction_0_1_",out_dir_pre+"reaction_1_36_",out_dir_pre+"reaction_4_40_"]
+        out_file_name="reaction_rd_stat_"+str(reaction_range[0])+"_"+str(reaction_range[-1])+".csv"
+        out_reaction_file=open(out_file_name,"w")
+        first=False
+        phi_list=["0"]
+        for reaction_number in reaction_range:
+            print "now stat reaction %d\n" %reaction_number
+            rd_value_list=[]
+            for input_dir_pre in input_dir_pre_list:
+                input_file_path=input_dir_pre+str(reaction_number)+os.sep+"mean_of_29_interval.csv"
+                input_file=open(input_file_path,"r")
+                line = input_file.readline()
+                pattern = r'([\d]+\.[\d]*),([\d]+\.[\d]*)'
+                while line:
+                    match = re.search(pattern, line)
+                    if match:
+                        if not first:
+                            phi_list.append(match.group(1))
+                        rd_value_list.append(match.group(2))
+                    line=input_file.readline()
+                input_file.close()
+            if not first:
+                phi_str=",".join(phi_list)
+                out_reaction_file.write(phi_str+"\n")
+                first=True
+            rd_value_str = ",".join(rd_value_list)
+            out_reaction_file.write(str(reaction_number)+","+rd_value_str + "\n")
+        out_reaction_file.close()
+def reaction_param_sim():
+    function_util = FunctionUtil()
+    param_base_path = "input_new" + os.sep
+    out_dir_pre = "2cell_pat_"
+
+    antisovle_file_path = ["u_p_p_0025.csv", "u_p_m_00075.csv", "m_m_p_01.csv", "m_m_m_02.csv", "h_p_h_p_011.csv",
+                           "h_m_u_p_02.csv"]
+
+    antisovle_file_pre = "anti_solve_phi" + os.sep + "phid_antisolved_"
+
+    reaction_number_file_hash = {42: 0, 44: 0, 43: 1, 45: 1, 50: 2, 46: 2, 53: 3, 49: 3, 11: 4, 21: 4, 26: 4, 14: 4,
+                                 23: 4, 28: 4, 15: 5, 29: 5, 57: 5, 61: 5}
+
+    reaction_number = 45
+    simulation = False
+    out_dir_path = out_dir_pre + "reaction_sim_" + str(reaction_number)
+    if simulation == True:
+
+        global phid_hash_path
+
+        phid_hash_path = antisovle_file_pre + antisovle_file_path[reaction_number_file_hash[reaction_number]]
+
+        procedure_param_file_path = param_base_path + "reaction_param_simulation.txt"
+        reaction_param_file_path = param_base_path + "reaction_" + str(reaction_number) + ".txt"
+        reaction_param_file_for_0_path = param_base_path + "phi_try_reaction_0.txt"
+        param_hash = load_param_from_file(procedure_param_file_path)
+
+        param_hash["OUTPUT_DIR_first"] = out_dir_path
+
+        start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
+        param_hash["just_simulate"] = "False"
+        start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
+    else:
+        name = out_dir_path
+        base = "D:\\Methylation_Server\\" + name + "\\repeat_1\\partial_1\\"
+        rd_dir_name = base + "rd_without"
+        out_file_path = base + name + "_mean_29.csv"
+        calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+def float_hash(**hash):
+    new_hash={}
+    for (k,v) in  hash.items():
+        new_hash[k]=float(v)
+    return new_hash
+def set_global_norm_param(**hash):
+    global beta,gamma,power,alpha,c_off
+    beta=hash["beta"]
+    gamma=hash["gamma"]
+    power=hash["power"]
+    alpha=hash["alpha"]
+    c_off=hash["c_off"]
+def normal_distribution_simulation():
+    function_util = FunctionUtil()
+    param_base_path = "input_new" + os.sep
+    out_dir_pre = "2cell_pat_"
+    reaction_list=[51]
+    for reaction_number in reaction_list:
+        normal_distribution_param_file="input_new"+os.sep+"diff_reaction_normal_dis_param"+os.sep+"norm_reaction_"+str(reaction_number)+".txt"
+        norm_hash=load_param_from_file(normal_distribution_param_file)
+        norm_hash=float_hash(**norm_hash)
+        set_global_norm_param(**norm_hash)
+        simulation = True
+        out_dir_path = out_dir_pre + "norm_reaction_sim_" + str(reaction_number)+"_up"
+        if simulation == True:
+
+            procedure_param_file_path = param_base_path + "reaction_param_simulation.txt"
+            reaction_param_file_path = param_base_path + "reaction_" + str(reaction_number) + ".txt"
+            reaction_param_file_for_0_path = param_base_path + "phi_try_reaction_0.txt"
+            param_hash = load_param_from_file(procedure_param_file_path)
+
+            param_hash["OUTPUT_DIR_first"] = out_dir_path
+
+            start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
+            param_hash["just_simulate"] = "False"
+            start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
+        else:
+            name = out_dir_path
+            base=name+os.sep+"repeat_1"+os.sep+"partial_1"+os.sep
+            #base = "D:\\Methylation_Server\\" + name + "\\repeat_1\\partial_1\\"
+            rd_dir_name = base + "rd_without"
+            out_file_path = base + name + "_mean_29.csv"
+            calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+def diff_period_simulation():
+    function_util = FunctionUtil()
+    param_base_path = "input_new" + os.sep
+    period_name_list=["sperm","oocyte","mat_2","pat_4","mat_4","pat_65","mat_65","pat_75","mat_75","female_135","male_135"]
+
+    simulation = True
+
+    period_name="mat_2"
+
+    normal_distribution_param_file="input_new"+os.sep+"diff_period_param"+os.sep+period_name+".txt"
+    norm_hash=load_param_from_file(normal_distribution_param_file)
+    norm_hash=float_hash(**norm_hash)
+    set_global_norm_param(**norm_hash)
+    out_dir_path = period_name
+    if simulation == True:
+
+        procedure_param_file_path = param_base_path + "reaction_param_simulation.txt"
+        reaction_param_file_path = param_base_path + "reaction_0.txt"
+        reaction_param_file_for_0_path = param_base_path + "phi_try_reaction_0.txt"
+        param_hash = load_param_from_file(procedure_param_file_path)
+
+        param_hash["OUTPUT_DIR_first"] = out_dir_path
+
+        start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
+        param_hash["just_simulate"] = "False"
+        #start_simulation(function_util, reaction_param_file_path, reaction_param_file_for_0_path, **param_hash)
+    else:
+        name = out_dir_path
+        base=name+os.sep+"repeat_1"+os.sep+"partial_1"+os.sep
+        #base = "D:\\Methylation_Server\\" + name + "\\repeat_1\\partial_1\\"
+        rd_dir_name = base + "rd_without"
+        out_file_path = base + name + "_mean_29.csv"
+        calc_mean_rd_from_rd_dir(rd_dir_name, out_file_path)
+def get_mean_methylation_level(methy_str):
+    total_count=len(methy_str)-1
+    h_count=methy_str.count("H")
+    m_count=methy_str.count("M")
+    mean_methy_level=(h_count*0.5+m_count*1.0)/float(total_count)
+    return mean_methy_level
+def calc_mean_and_std_var(input_list):
+    N=float(len(input_list))
+    narray=np.array(input_list)
+    sum1=narray.sum()
+    narray2=narray*narray
+    sum2=narray2.sum()
+    mean=sum1/N
+    std_var=math.sqrt(sum2/N-mean**2)
+    return mean,std_var
+#输入文件夹,输出该文件夹得出的各个repeat的各个generation的均值,单repeat均值,方差,均值列表,总均值,方差.
+def calc_mean_methylation_level_and_deviation(input_detail_dir,gen=29):
+    gen_steps=[gen+0.01*i for i in range(1,101)]
+    gen_steps_str_list=[str(gen_step).replace(".","_") for gen_step in gen_steps]
+    gen_stats={}
+    line_no=6
+    for gen_step in gen_steps_str_list:
+        gen_stats[gen_step]={}
+        input_detail_file=open(input_detail_dir+os.sep+"gen_"+gen_step+"_detail.csv")
+        line=input_detail_file.readline()
+        while line:
+            line_arr=re.split(",|\n",line)
+            line_no=int(line_arr[0])
+            methy_str=line_arr[1]
+            mean_methylation_level=get_mean_methylation_level(methy_str)
+            gen_stats[gen_step][line_no]=mean_methylation_level
+            line=input_detail_file.readline()
+        input_detail_file.close()
+    gen_mean_list=[]
+    gen_std_var_list=[]
+    for i in range(1,line_no+1):
+        gen_methy_list=[]
+        for gen_step in gen_steps_str_list:
+            gen_methy_list.append(gen_stats[gen_step][i])
+        mean,std_var=calc_mean_and_std_var(gen_methy_list)
+        #print "repeat %d: \t mean:%.4f \t std:%.4f\n" % (i,mean,std_var)
+        gen_mean_list.append(mean)
+        gen_std_var_list.append(std_var)
+    t_mean,t_std_var=calc_mean_and_std_var(gen_mean_list)
+    #print "total repeat: \t mean:%.4f \t std:%.4f\n" % (t_mean,t_std_var)
+    return t_mean,t_std_var
+def get_list_mean_methylation_level_up_down(reaction_ids,out_file_path):
+    pre_dir="/Users/Ren/PycharmProjects/Methylation_Server/2cell_pat_norm_reaction_sim_"
+    post_dir="/repeat_1/partial_1/sorted_detail"
+    out_file=open(out_file_path,"w")
+    up_downs=["_up","_down"]
+
+    for id in reaction_ids:
+        for up_down in up_downs:
+            input_dir=pre_dir+str(id)+up_down+post_dir
+            gen=29
+            t_mean,t_std_var=calc_mean_methylation_level_and_deviation(input_dir,gen=gen)
+            print "reaction %d: \t mean:%.4f \t std:%.4f\n" % (id,t_mean,t_std_var)
+            out_str=str(id)+up_down+","+str(t_mean)+","+str(t_std_var)+"\n"
+            out_file.write(out_str)
+    out_file.close()
+def get_list_mean_methylation_level(ids,out_file_path):
+    pre_dir="/Users/Ren/PycharmProjects/Methylation_Server/"
+    post_dir="/repeat_1/partial_1/sorted_detail"
+    out_file=open(out_file_path,"w")
+    for id in ids:
+        input_dir=pre_dir+str(id)+post_dir
+        gen=29
+        t_mean,t_std_var=calc_mean_methylation_level_and_deviation(input_dir,gen=gen)
+        print "%s: \t mean:%.4f \t std:%.4f\n" % (str(id),t_mean,t_std_var)
+        out_str=str(id)+","+str(t_mean)+","+str(t_std_var)+"\n"
+        out_file.write(out_str)
+    out_file.close()
+if __name__ == '__main__':
+    # reaction_ids=[0,3,39,67,69,62,70,71,47,72,73,51,66,63,64,68,53,49,65]
+    # reaction_ids=[0,49,53,64,66,68,71,73]
+    # ids=["sperm","oocyte","mat_2","pat_4","mat_4","pat_65","mat_65","pat_75","mat_75","female_135","male_135"]
+    # out_file_path="reaction_methylation_level_period.csv"
+    # get_list_mean_methylation_level(ids,out_file_path)
+    # normal_distribution_simulation()
+    diff_period_simulation()

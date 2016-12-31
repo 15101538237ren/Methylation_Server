@@ -137,12 +137,12 @@ def calc_promoter_cpg_distribution(pickle_path,dna_seq_pkl_dir,out_file_path,seq
         print "finish chr%d writiing" % chr_no
     out_file.close()
 if __name__ == '__main__':
-    species="zebrafish_cpg_distribution"
-    strand_standard="-"
+    species="mouse_cpg_distribution"
+    strand_standard="+"
     chr_min=1
-    chr_max=26
+    chr_max=2
 
-    seq_storage=False #DNA序列是否第一次读取,需要缓存成pkl
+    seq_storage=True #DNA序列是否第一次读取,需要缓存成pkl
 
     pickle_path=species+os.sep+"promoter_tss_"+strand_standard+".pkl"
     dna_pkl_path=species+os.sep+"dna"+os.sep+"pickle"
@@ -167,4 +167,4 @@ if __name__ == '__main__':
 
     # extract_all_TSS_pos_from_gtf(zebrafish_gtf_path,pickle_path,pattern=zebrafish_pattern,strand_standard=strand_standard,chr_min=chr_min,chr_max=chr_max)
 
-    calc_promoter_cpg_distribution(pickle_path,dna_pkl_path,out_file_path,sequence_dir,zebrafish_dna_file_pre,seq_storage=seq_storage,chr_min=chr_min,chr_max=chr_max,strand_standard=strand_standard)
+    calc_promoter_cpg_distribution(pickle_path,dna_pkl_path,out_file_path,sequence_dir,mouse_dna_file_pre,seq_storage=seq_storage,chr_min=chr_min,chr_max=chr_max,strand_standard=strand_standard)
